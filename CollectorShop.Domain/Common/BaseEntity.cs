@@ -8,6 +8,11 @@ public abstract class BaseEntity
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
 
+    // Soft delete support
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeletedBy { get; set; }
+
     private readonly List<IDomainEvent> _domainEvents = new();
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
@@ -24,5 +29,19 @@ public abstract class BaseEntity
     public void ClearDomainEvents()
     {
         _domainEvents.Clear();
+    }
+
+    public virtual void SoftDelete(string? deletedBy = null)
+    {
+        IsDeleted = true;
+        DeletedAt = DateTime.UtcNow;
+        DeletedBy = deletedBy;
+    }
+
+    public virtual void Restore()
+    {
+        IsDeleted = false;
+        DeletedAt = null;
+        DeletedBy = null;
     }
 }

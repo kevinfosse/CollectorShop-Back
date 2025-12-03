@@ -20,6 +20,10 @@ builder.Host.UseSerilog();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApiServices(builder.Configuration);
 
+// Add Health Checks
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<CollectorShop.Infrastructure.Data.ApplicationDbContext>("database");
+
 var app = builder.Build();
 
 // Seed roles
@@ -38,6 +42,9 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Exception handling should be first in the pipeline
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -49,15 +56,16 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-
 app.UseHttpsRedirection();
 
-app.UseCors("AllowAll");
+app.UseCors("DefaultPolicy");
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+app.MapControllers().RequireRateLimiting("fixed");
+app.MapHealthChecks("/health");
 
 app.Run();

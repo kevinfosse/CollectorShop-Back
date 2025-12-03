@@ -7,7 +7,10 @@ public partial class Email : ValueObject
 {
     public string Value { get; private set; }
 
-    private Email() { }
+    private Email()
+    {
+        Value = null!;
+    }
 
     public Email(string value)
     {

@@ -18,10 +18,10 @@ public class Product : BaseEntity
     public ProductCondition Condition { get; private set; }
     public decimal Weight { get; private set; }
     public string? Dimensions { get; private set; }
-    
+
     public Guid CategoryId { get; private set; }
     public Category Category { get; private set; } = null!;
-    
+
     public Guid? BrandId { get; private set; }
     public Brand? Brand { get; private set; }
 
@@ -34,7 +34,13 @@ public class Product : BaseEntity
     private readonly List<Review> _reviews = new();
     public IReadOnlyCollection<Review> Reviews => _reviews.AsReadOnly();
 
-    private Product() { }
+    private Product()
+    {
+        Name = null!;
+        Description = null!;
+        Sku = null!;
+        Price = null!;
+    }
 
     public Product(
         string name,
@@ -83,7 +89,7 @@ public class Product : BaseEntity
     {
         if (quantity <= 0)
             throw new ArgumentException("Quantity must be positive", nameof(quantity));
-        
+
         StockQuantity += quantity;
         UpdatedAt = DateTime.UtcNow;
     }
@@ -94,7 +100,7 @@ public class Product : BaseEntity
             throw new ArgumentException("Quantity must be positive", nameof(quantity));
         if (quantity > AvailableQuantity)
             throw new InvalidOperationException("Insufficient available stock");
-        
+
         StockQuantity -= quantity;
         UpdatedAt = DateTime.UtcNow;
     }
@@ -105,7 +111,7 @@ public class Product : BaseEntity
             throw new ArgumentException("Quantity must be positive", nameof(quantity));
         if (quantity > AvailableQuantity)
             throw new InvalidOperationException("Insufficient available stock to reserve");
-        
+
         ReservedQuantity += quantity;
         UpdatedAt = DateTime.UtcNow;
     }
@@ -116,7 +122,7 @@ public class Product : BaseEntity
             throw new ArgumentException("Quantity must be positive", nameof(quantity));
         if (quantity > ReservedQuantity)
             throw new InvalidOperationException("Cannot release more than reserved quantity");
-        
+
         ReservedQuantity -= quantity;
         UpdatedAt = DateTime.UtcNow;
     }

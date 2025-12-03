@@ -15,7 +15,11 @@ public class Shipment : BaseEntity
     public DateTime? EstimatedDeliveryDate { get; private set; }
     public DateTime? DeliveredAt { get; private set; }
 
-    private Shipment() { }
+    private Shipment()
+    {
+        TrackingNumber = null!;
+        Carrier = null!;
+    }
 
     public Shipment(Guid orderId, string trackingNumber, string carrier)
     {

@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<ICartRepository, CartRepository>();
         services.AddScoped<ICouponRepository, CouponRepository>();
         services.AddScoped<IReviewRepository, ReviewRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         // Services
         services.AddScoped<IEmailService, EmailService>();

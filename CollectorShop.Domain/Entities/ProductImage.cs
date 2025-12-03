@@ -12,7 +12,10 @@ public class ProductImage : BaseEntity
     public Guid ProductId { get; private set; }
     public Product Product { get; private set; } = null!;
 
-    private ProductImage() { }
+    private ProductImage()
+    {
+        Url = null!;
+    }
 
     public ProductImage(Guid productId, string url, string? altText = null, int displayOrder = 0, bool isPrimary = false)
     {

@@ -7,11 +7,13 @@ using CollectorShop.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace CollectorShop.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -19,23 +21,26 @@ public class AuthController : ControllerBase
     private readonly ITokenService _tokenService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<AuthController> _logger;
+    private readonly IConfiguration _configuration;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         ITokenService tokenService,
         IUnitOfWork unitOfWork,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        IConfiguration configuration)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _tokenService = tokenService;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _configuration = configuration;
     }
 
     [HttpPost("register")]
-    public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request)
+    public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         var existingUser = await _userManager.FindByEmailAsync(request.Email);
         if (existingUser != null)
@@ -66,20 +71,26 @@ public class AuthController : ControllerBase
             new Email(request.Email),
             user.Id
         );
-        await _unitOfWork.Customers.AddAsync(customer);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.Customers.AddAsync(customer, cancellationToken);
 
+        // Generate tokens
         var roles = await _userManager.GetRolesAsync(user);
         var accessToken = _tokenService.GenerateAccessToken(user, roles);
-        var refreshToken = _tokenService.GenerateRefreshToken();
+        var refreshTokenValue = _tokenService.GenerateRefreshToken();
+
+        // Store refresh token
+        var refreshTokenExpirationDays = _configuration.GetValue<int>("JwtSettings:RefreshTokenExpirationInDays", 7);
+        var refreshToken = new RefreshToken(refreshTokenValue, user.Id, refreshTokenExpirationDays);
+        await _unitOfWork.RefreshTokens.AddAsync(refreshToken, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("User {Email} registered successfully", request.Email);
 
         return Ok(new AuthResponse
         {
             AccessToken = accessToken,
-            RefreshToken = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            RefreshToken = refreshTokenValue,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("JwtSettings:ExpirationInMinutes", 60)),
             User = new UserDto
             {
                 Id = user.Id,
@@ -92,7 +103,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request)
+    public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var user = await _userManager.FindByEmailAsync(request.Email);
         if (user == null)
@@ -113,17 +124,24 @@ public class AuthController : ControllerBase
         user.LastLoginAt = DateTime.UtcNow;
         await _userManager.UpdateAsync(user);
 
+        // Generate tokens
         var roles = await _userManager.GetRolesAsync(user);
         var accessToken = _tokenService.GenerateAccessToken(user, roles);
-        var refreshToken = _tokenService.GenerateRefreshToken();
+        var refreshTokenValue = _tokenService.GenerateRefreshToken();
+
+        // Store refresh token
+        var refreshTokenExpirationDays = _configuration.GetValue<int>("JwtSettings:RefreshTokenExpirationInDays", 7);
+        var refreshToken = new RefreshToken(refreshTokenValue, user.Id, refreshTokenExpirationDays);
+        await _unitOfWork.RefreshTokens.AddAsync(refreshToken, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("User {Email} logged in successfully", request.Email);
 
         return Ok(new AuthResponse
         {
             AccessToken = accessToken,
-            RefreshToken = refreshToken,
-            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            RefreshToken = refreshTokenValue,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("JwtSettings:ExpirationInMinutes", 60)),
             User = new UserDto
             {
                 Id = user.Id,
@@ -136,35 +154,52 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh-token")]
-    public async Task<ActionResult<AuthResponse>> RefreshToken([FromBody] RefreshTokenRequest request)
+    public async Task<ActionResult<AuthResponse>> RefreshToken([FromBody] RefreshTokenRequest request, CancellationToken cancellationToken)
     {
-        var principal = _tokenService.GetPrincipalFromExpiredToken(request.AccessToken);
-        if (principal == null)
+        // Validate the old refresh token
+        var storedToken = await _unitOfWork.RefreshTokens.GetByTokenAsync(request.RefreshToken, cancellationToken);
+        if (storedToken == null)
         {
-            return Unauthorized(new { Message = "Invalid token" });
+            return Unauthorized(new { Message = "Invalid refresh token" });
         }
 
-        var userId = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId))
+        if (!storedToken.IsActive)
         {
-            return Unauthorized(new { Message = "Invalid token" });
+            // Token reuse detected - revoke all tokens for this user
+            if (storedToken.IsRevoked)
+            {
+                await _unitOfWork.RefreshTokens.RevokeAllUserTokensAsync(storedToken.UserId, "Attempted reuse of revoked token", cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                _logger.LogWarning("Refresh token reuse detected for user {UserId}", storedToken.UserId);
+            }
+            return Unauthorized(new { Message = "Invalid refresh token" });
         }
 
-        var user = await _userManager.FindByIdAsync(userId);
+        var user = await _userManager.FindByIdAsync(storedToken.UserId);
         if (user == null)
         {
             return Unauthorized(new { Message = "User not found" });
         }
 
+        // Revoke old token
+        var newRefreshTokenValue = _tokenService.GenerateRefreshToken();
+        storedToken.Revoke("Replaced by new token", newRefreshTokenValue);
+
+        // Create new refresh token
+        var refreshTokenExpirationDays = _configuration.GetValue<int>("JwtSettings:RefreshTokenExpirationInDays", 7);
+        var newRefreshToken = new RefreshToken(newRefreshTokenValue, user.Id, refreshTokenExpirationDays);
+        await _unitOfWork.RefreshTokens.AddAsync(newRefreshToken, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Generate new access token
         var roles = await _userManager.GetRolesAsync(user);
         var newAccessToken = _tokenService.GenerateAccessToken(user, roles);
-        var newRefreshToken = _tokenService.GenerateRefreshToken();
 
         return Ok(new AuthResponse
         {
             AccessToken = newAccessToken,
-            RefreshToken = newRefreshToken,
-            ExpiresAt = DateTime.UtcNow.AddHours(1),
+            RefreshToken = newRefreshTokenValue,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("JwtSettings:ExpirationInMinutes", 60)),
             User = new UserDto
             {
                 Id = user.Id,
@@ -177,7 +212,55 @@ public class AuthController : ControllerBase
     }
 
     [Authorize]
+    [HttpPost("revoke-token")]
+    public async Task<IActionResult> RevokeToken([FromBody] RevokeTokenRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var token = await _unitOfWork.RefreshTokens.GetByTokenAsync(request.RefreshToken, cancellationToken);
+        if (token == null || token.UserId != userId)
+        {
+            return BadRequest(new { Message = "Invalid token" });
+        }
+
+        if (!token.IsActive)
+        {
+            return BadRequest(new { Message = "Token already revoked or expired" });
+        }
+
+        token.Revoke("Revoked by user");
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("User {UserId} revoked a refresh token", userId);
+
+        return Ok(new { Message = "Token revoked successfully" });
+    }
+
+    [Authorize]
+    [HttpPost("revoke-all-tokens")]
+    public async Task<IActionResult> RevokeAllTokens(CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        await _unitOfWork.RefreshTokens.RevokeAllUserTokensAsync(userId, "Revoked all by user", cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("User {UserId} revoked all refresh tokens", userId);
+
+        return Ok(new { Message = "All tokens revoked successfully" });
+    }
+
+    [Authorize]
     [HttpPost("change-password")]
+    [DisableRateLimiting]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;

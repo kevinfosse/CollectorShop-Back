@@ -17,6 +17,7 @@ public class UnitOfWork : IUnitOfWork
     private ICartRepository? _carts;
     private ICouponRepository? _coupons;
     private IReviewRepository? _reviews;
+    private IRefreshTokenRepository? _refreshTokens;
 
     public UnitOfWork(ApplicationDbContext context)
     {
@@ -31,6 +32,7 @@ public class UnitOfWork : IUnitOfWork
     public ICartRepository Carts => _carts ??= new CartRepository(_context);
     public ICouponRepository Coupons => _coupons ??= new CouponRepository(_context);
     public IReviewRepository Reviews => _reviews ??= new ReviewRepository(_context);
+    public IRefreshTokenRepository RefreshTokens => _refreshTokens ??= new RefreshTokenRepository(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

@@ -9,7 +9,7 @@ public class Order : BaseEntity
 {
     public string OrderNumber { get; private set; }
     public OrderStatus Status { get; private set; }
-    
+
     public Guid CustomerId { get; private set; }
     public Customer Customer { get; private set; } = null!;
 
@@ -36,7 +36,17 @@ public class Order : BaseEntity
 
     public Shipment? Shipment { get; private set; }
 
-    private Order() { }
+    private Order()
+    {
+        OrderNumber = null!;
+        ShippingAddress = null!;
+        BillingAddress = null!;
+        SubTotal = null!;
+        ShippingCost = null!;
+        TaxAmount = null!;
+        DiscountAmount = null!;
+        TotalAmount = null!;
+    }
 
     public Order(
         Guid customerId,
@@ -52,7 +62,7 @@ public class Order : BaseEntity
         Notes = notes;
         Status = OrderStatus.Pending;
         OrderNumber = GenerateOrderNumber();
-        
+
         SubTotal = Money.Zero();
         ShippingCost = Money.Zero();
         TaxAmount = Money.Zero();
@@ -117,15 +127,15 @@ public class Order : BaseEntity
 
     private void RecalculateTotals()
     {
-        SubTotal = _items.Any() 
+        SubTotal = _items.Any()
             ? _items.Aggregate(Money.Zero(), (total, item) => total.Add(item.TotalPrice))
             : Money.Zero();
-        
+
         TotalAmount = SubTotal
             .Add(ShippingCost)
             .Add(TaxAmount)
             .Subtract(DiscountAmount);
-        
+
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -162,7 +172,7 @@ public class Order : BaseEntity
         UpdatedAt = DateTime.UtcNow;
 
         Shipment = new Shipment(Id, trackingNumber, carrier);
-        
+
         AddDomainEvent(new OrderShippedEvent(Id, OrderNumber, CustomerId, trackingNumber));
     }
 

@@ -14,7 +14,11 @@ public class CustomerAddress : BaseEntity
     public Guid CustomerId { get; private set; }
     public Customer Customer { get; private set; } = null!;
 
-    private CustomerAddress() { }
+    private CustomerAddress()
+    {
+        Label = null!;
+        Address = null!;
+    }
 
     public CustomerAddress(
         Guid customerId,

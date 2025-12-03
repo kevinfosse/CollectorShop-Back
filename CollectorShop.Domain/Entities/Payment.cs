@@ -20,7 +20,10 @@ public class Payment : BaseEntity
     public DateTime? PaidAt { get; private set; }
     public DateTime? RefundedAt { get; private set; }
 
-    private Payment() { }
+    private Payment()
+    {
+        Amount = null!;
+    }
 
     public Payment(Guid orderId, Money amount, PaymentMethod method)
     {

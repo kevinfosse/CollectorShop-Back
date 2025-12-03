@@ -10,6 +10,7 @@ public interface IUnitOfWork : IDisposable
     ICartRepository Carts { get; }
     ICouponRepository Coupons { get; }
     IReviewRepository Reviews { get; }
+    IRefreshTokenRepository RefreshTokens { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
     Task BeginTransactionAsync(CancellationToken cancellationToken = default);

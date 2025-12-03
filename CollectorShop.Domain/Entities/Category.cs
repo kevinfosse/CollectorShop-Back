@@ -20,7 +20,12 @@ public class Category : BaseEntity
     private readonly List<Product> _products = new();
     public IReadOnlyCollection<Product> Products => _products.AsReadOnly();
 
-    private Category() { }
+    private Category()
+    {
+        Name = null!;
+        Description = null!;
+        Slug = null!;
+    }
 
     public Category(string name, string description, string slug, Guid? parentCategoryId = null)
     {
@@ -61,7 +66,7 @@ public class Category : BaseEntity
     {
         if (parentCategoryId == Id)
             throw new InvalidOperationException("Category cannot be its own parent");
-        
+
         ParentCategoryId = parentCategoryId;
         UpdatedAt = DateTime.UtcNow;
     }

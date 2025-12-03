@@ -1,8 +1,10 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using CollectorShop.API.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
@@ -22,20 +24,56 @@ public static class DependencyInjection
         // MediatR
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 
-        // CORS
+        // CORS - Environment-specific configuration
+        var allowedOrigins = configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
         services.AddCors(options =>
         {
-            options.AddPolicy("AllowAll", builder =>
+            options.AddPolicy("DefaultPolicy", builder =>
             {
-                builder.AllowAnyOrigin()
-                       .AllowAnyMethod()
-                       .AllowAnyHeader();
+                if (allowedOrigins.Length > 0)
+                {
+                    builder.WithOrigins(allowedOrigins)
+                           .AllowAnyMethod()
+                           .AllowAnyHeader()
+                           .AllowCredentials();
+                }
+                else
+                {
+                    // Fallback for development if not configured
+                    builder.AllowAnyOrigin()
+                           .AllowAnyMethod()
+                           .AllowAnyHeader();
+                }
+            });
+        });
+
+        // Rate Limiting
+        var rateLimitConfig = configuration.GetSection("RateLimiting");
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            options.AddFixedWindowLimiter("fixed", limiterOptions =>
+            {
+                limiterOptions.PermitLimit = rateLimitConfig.GetValue<int>("PermitLimit", 100);
+                limiterOptions.Window = TimeSpan.FromSeconds(rateLimitConfig.GetValue<int>("Window", 60));
+                limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                limiterOptions.QueueLimit = rateLimitConfig.GetValue<int>("QueueLimit", 2);
+            });
+
+            // Stricter limit for authentication endpoints
+            options.AddFixedWindowLimiter("auth", limiterOptions =>
+            {
+                limiterOptions.PermitLimit = 10;
+                limiterOptions.Window = TimeSpan.FromMinutes(1);
+                limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                limiterOptions.QueueLimit = 0;
             });
         });
 
         // JWT Authentication
         var jwtSettings = configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured");
+        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured. Please set it in User Secrets or environment variables.");
 
         services.AddAuthentication(options =>
         {
@@ -100,9 +138,9 @@ public static class DependencyInjection
         });
 
         // Custom Services
-        services.AddScoped<ITokenService, TokenService>();
-        services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddHttpContextAccessor();
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<CollectorShop.Domain.Interfaces.ICurrentUserService, CurrentUserService>();
 
         return services;
     }

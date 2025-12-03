@@ -10,7 +10,11 @@ public class ProductAttribute : BaseEntity
     public Guid ProductId { get; private set; }
     public Product Product { get; private set; } = null!;
 
-    private ProductAttribute() { }
+    private ProductAttribute()
+    {
+        Name = null!;
+        Value = null!;
+    }
 
     public ProductAttribute(Guid productId, string name, string value)
     {

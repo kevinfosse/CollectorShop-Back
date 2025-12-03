@@ -29,7 +29,12 @@ public class Customer : BaseEntity
     private readonly List<WishlistItem> _wishlistItems = new();
     public IReadOnlyCollection<WishlistItem> WishlistItems => _wishlistItems.AsReadOnly();
 
-    private Customer() { }
+    private Customer()
+    {
+        FirstName = null!;
+        LastName = null!;
+        Email = null!;
+    }
 
     public Customer(string firstName, string lastName, Email email, string? userId = null)
     {

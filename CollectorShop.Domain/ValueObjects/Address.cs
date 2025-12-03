@@ -10,7 +10,14 @@ public class Address : ValueObject
     public string Country { get; private set; }
     public string ZipCode { get; private set; }
 
-    private Address() { }
+    private Address()
+    {
+        Street = null!;
+        City = null!;
+        State = null!;
+        Country = null!;
+        ZipCode = null!;
+    }
 
     public Address(string street, string city, string state, string country, string zipCode)
     {

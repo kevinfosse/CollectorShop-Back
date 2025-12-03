@@ -14,7 +14,12 @@ public class Brand : BaseEntity
     private readonly List<Product> _products = new();
     public IReadOnlyCollection<Product> Products => _products.AsReadOnly();
 
-    private Brand() { }
+    private Brand()
+    {
+        Name = null!;
+        Description = null!;
+        Slug = null!;
+    }
 
     public Brand(string name, string description, string slug)
     {

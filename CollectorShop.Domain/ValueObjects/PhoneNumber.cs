@@ -7,7 +7,10 @@ public partial class PhoneNumber : ValueObject
 {
     public string Value { get; private set; }
 
-    private PhoneNumber() { }
+    private PhoneNumber()
+    {
+        Value = null!;
+    }
 
     public PhoneNumber(string value)
     {
@@ -15,7 +18,7 @@ public partial class PhoneNumber : ValueObject
             throw new ArgumentException("Phone number cannot be empty", nameof(value));
 
         var cleanedNumber = PhoneCleanupRegex().Replace(value, "");
-        
+
         if (cleanedNumber.Length < 10 || cleanedNumber.Length > 15)
             throw new ArgumentException("Invalid phone number format", nameof(value));
 

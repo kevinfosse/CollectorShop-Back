@@ -99,3 +99,9 @@ public class ResetPasswordRequest
     [Compare("NewPassword")]
     public string ConfirmNewPassword { get; set; } = string.Empty;
 }
+
+public class RevokeTokenRequest
+{
+    [Required]
+    public string RefreshToken { get; set; } = string.Empty;
+}

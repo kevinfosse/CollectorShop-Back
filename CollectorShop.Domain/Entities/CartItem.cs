@@ -14,7 +14,10 @@ public class CartItem : BaseEntity
     public int Quantity { get; private set; }
     public Money UnitPrice { get; private set; }
 
-    private CartItem() { }
+    private CartItem()
+    {
+        UnitPrice = null!;
+    }
 
     public CartItem(Guid cartId, Guid productId, int quantity, Money unitPrice)
     {

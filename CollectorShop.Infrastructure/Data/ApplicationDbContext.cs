@@ -1,5 +1,6 @@
 using CollectorShop.Domain.Common;
 using CollectorShop.Domain.Entities;
+using CollectorShop.Domain.Interfaces;
 using MediatR;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -9,11 +10,13 @@ namespace CollectorShop.Infrastructure.Data;
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 {
     private readonly IMediator _mediator;
+    private readonly ICurrentUserService? _currentUserService;
 
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IMediator mediator)
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IMediator mediator, ICurrentUserService? currentUserService = null)
         : base(options)
     {
         _mediator = mediator;
+        _currentUserService = currentUserService;
     }
 
     public DbSet<Product> Products => Set<Product>();
@@ -32,27 +35,46 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<WishlistItem> WishlistItems => Set<WishlistItem>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<Coupon> Coupons => Set<Coupon>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        // Apply soft delete global query filter to all entities inheriting from BaseEntity
+        foreach (var entityType in builder.Model.GetEntityTypes())
+        {
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+                var property = System.Linq.Expressions.Expression.Property(parameter, nameof(BaseEntity.IsDeleted));
+                var filterExpression = System.Linq.Expressions.Expression.Equal(property, System.Linq.Expressions.Expression.Constant(false));
+                var lambda = System.Linq.Expressions.Expression.Lambda(filterExpression, parameter);
+
+                builder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+            }
+        }
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         await DispatchDomainEventsAsync();
-        
+
+        var currentUserId = _currentUserService?.UserId;
+
         foreach (var entry in ChangeTracker.Entries<BaseEntity>())
         {
             switch (entry.State)
             {
                 case EntityState.Added:
                     entry.Entity.CreatedAt = DateTime.UtcNow;
+                    entry.Entity.CreatedBy = currentUserId;
                     break;
                 case EntityState.Modified:
                     entry.Entity.UpdatedAt = DateTime.UtcNow;
+                    entry.Entity.UpdatedBy = currentUserId;
                     break;
             }
         }

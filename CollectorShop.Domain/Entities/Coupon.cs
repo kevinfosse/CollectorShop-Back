@@ -11,7 +11,7 @@ public class Coupon : BaseEntity
     public decimal Value { get; private set; } // Percentage or Fixed amount
     public Money? MinimumOrderAmount { get; private set; }
     public Money? MaximumDiscountAmount { get; private set; }
-    
+
     public int? UsageLimit { get; private set; }
     public int UsageCount { get; private set; }
     public int? UsageLimitPerCustomer { get; private set; }
@@ -20,7 +20,11 @@ public class Coupon : BaseEntity
     public DateTime? ExpiresAt { get; private set; }
     public bool IsActive { get; private set; }
 
-    private Coupon() { }
+    private Coupon()
+    {
+        Code = null!;
+        Description = null!;
+    }
 
     public Coupon(
         string code,

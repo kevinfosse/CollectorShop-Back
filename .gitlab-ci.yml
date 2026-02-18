@@ -35,10 +35,10 @@ test:unit:
   stage: test
   script:
     - dotnet test $SOLUTION_FILE
-        --no-restore
-        --collect:"XPlat Code Coverage"
-        --results-directory ./coverage
-        --logger "junit;LogFilePath=./tests-report.xml"
+      --no-restore
+      --collect:"XPlat Code Coverage"
+      --results-directory ./coverage
+      --logger "junit;LogFilePath=./tests-report.xml"
   coverage: '/Total\s*\|\s*(\d+(?:\.\d+)?)/'
   artifacts:
     when: always
@@ -48,7 +48,7 @@ test:unit:
         coverage_format: cobertura
         path: coverage/**/coverage.cobertura.xml
     expire_in: 1 week
-  allow-failure: false
+  allow_failure: false
 
 security:vulnerable-packages:
   stage: security

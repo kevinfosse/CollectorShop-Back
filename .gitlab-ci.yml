@@ -16,9 +16,6 @@ default:
   before_script:
     - dotnet restore $SOLUTION_FILE
 
-# ─────────────────────────────────────────
-# LINT
-# ─────────────────────────────────────────
 lint:format:
   stage: lint
   script:
@@ -51,6 +48,7 @@ test:unit:
         coverage_format: cobertura
         path: coverage/**/coverage.cobertura.xml
     expire_in: 1 week
+  allow-failure: false
 
 security:vulnerable-packages:
   stage: security
@@ -62,7 +60,7 @@ security:vulnerable-packages:
         cat vulnerable.txt
         exit 1
       fi
-  allow_failure: true
+  allow_failure: false
 
 sonar:analysis:
   stage: sonar

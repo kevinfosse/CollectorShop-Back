@@ -40,8 +40,11 @@ public class CustomersController : ControllerBase
             Email = customer.Email.Value,
             FirstName = customer.FirstName,
             LastName = customer.LastName,
+            FullName = customer.FullName,
             PhoneNumber = customer.PhoneNumber?.Value,
+            IsActive = customer.IsActive,
             IsEmailVerified = customer.IsEmailVerified,
+            LastLoginAt = customer.LastLoginAt,
             CreatedAt = customer.CreatedAt
         });
     }
@@ -83,8 +86,11 @@ public class CustomersController : ControllerBase
             Email = customer.Email.Value,
             FirstName = customer.FirstName,
             LastName = customer.LastName,
+            FullName = customer.FullName,
             PhoneNumber = customer.PhoneNumber?.Value,
+            IsActive = customer.IsActive,
             IsEmailVerified = customer.IsEmailVerified,
+            LastLoginAt = customer.LastLoginAt,
             CreatedAt = customer.CreatedAt
         });
     }

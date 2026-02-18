@@ -1,5 +1,8 @@
 using CollectorShop.API;
 using CollectorShop.API.Middleware;
+using CollectorShop.Domain.Entities;
+using CollectorShop.Domain.Interfaces;
+using CollectorShop.Domain.ValueObjects;
 using CollectorShop.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Serilog;
@@ -40,6 +43,26 @@ using (var scope = app.Services.CreateScope())
             await roleManager.CreateAsync(new IdentityRole(role));
         }
     }
+
+    // Seed a Customer profile for the DevAuth user so cart/wishlist work in dev mode
+    var bypassAuth = app.Configuration.GetValue<bool>("BypassAuth");
+    if (bypassAuth)
+    {
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+        var existingCustomer = await unitOfWork.Customers.GetByUserIdAsync("dev-user-id");
+        if (existingCustomer == null)
+        {
+            var devCustomer = new Customer(
+                "Dev",
+                "User",
+                new Email("dev@collectorshop.local"),
+                "dev-user-id"
+            );
+            await unitOfWork.Customers.AddAsync(devCustomer);
+            await unitOfWork.SaveChangesAsync();
+            Log.Information("Created dev Customer profile for DevAuth user");
+        }
+    }
 }
 
 // Exception handling should be first in the pipeline
@@ -56,9 +79,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
-
 app.UseCors("DefaultPolicy");
+
+app.UseHttpsRedirection();
 
 app.UseRateLimiter();
 

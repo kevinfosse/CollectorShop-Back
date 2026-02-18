@@ -59,6 +59,18 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
             .HasForeignKey(w => w.CustomerId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Navigation(c => c.Orders)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_orders");
+
+        builder.Navigation(c => c.Reviews)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_reviews");
+
+        builder.Navigation(c => c.WishlistItems)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_wishlistItems");
+
         builder.Ignore(c => c.Addresses);
     }
 }

@@ -127,9 +127,18 @@ public class Order : BaseEntity
 
     private void RecalculateTotals()
     {
+        var currency = _items.FirstOrDefault()?.TotalPrice.Currency ?? "USD";
         SubTotal = _items.Any()
-            ? _items.Aggregate(Money.Zero(), (total, item) => total.Add(item.TotalPrice))
-            : Money.Zero();
+            ? _items.Aggregate(Money.Zero(currency), (total, item) => total.Add(item.TotalPrice))
+            : Money.Zero(currency);
+
+        // Ensure related amounts use the same currency
+        if (ShippingCost.Currency != currency)
+            ShippingCost = Money.Zero(currency);
+        if (TaxAmount.Currency != currency)
+            TaxAmount = Money.Zero(currency);
+        if (DiscountAmount.Currency != currency)
+            DiscountAmount = Money.Zero(currency);
 
         TotalAmount = SubTotal
             .Add(ShippingCost)

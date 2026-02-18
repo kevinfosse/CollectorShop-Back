@@ -81,6 +81,18 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey(r => r.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Navigation(p => p.Images)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_images");
+
+        builder.Navigation(p => p.Attributes)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_attributes");
+
+        builder.Navigation(p => p.Reviews)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_reviews");
+
         builder.HasIndex(p => p.CategoryId);
         builder.HasIndex(p => p.BrandId);
         builder.HasIndex(p => p.IsActive);

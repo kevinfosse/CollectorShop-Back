@@ -12,7 +12,7 @@ public interface IEmailService
 public class EmailService : IEmailService
 {
     // TODO: Implement with actual email provider (SendGrid, SMTP, etc.)
-    
+
     public Task SendEmailAsync(string to, string subject, string body, CancellationToken cancellationToken = default)
     {
         // Implementation placeholder

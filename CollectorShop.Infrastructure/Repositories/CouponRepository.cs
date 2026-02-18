@@ -20,7 +20,7 @@ public class CouponRepository : Repository<Coupon>, ICouponRepository
     {
         var now = DateTime.UtcNow;
         return await _dbSet
-            .Where(c => c.IsActive 
+            .Where(c => c.IsActive
                 && (!c.StartsAt.HasValue || c.StartsAt.Value <= now)
                 && (!c.ExpiresAt.HasValue || c.ExpiresAt.Value > now))
             .ToListAsync(cancellationToken);

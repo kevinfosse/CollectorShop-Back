@@ -27,7 +27,7 @@ public class Cart : BaseEntity
         {
             if (!_items.Any())
                 return Money.Zero();
-            
+
             return _items.Aggregate(Money.Zero(), (total, item) => total.Add(item.TotalPrice));
         }
     }
@@ -40,7 +40,7 @@ public class Cart : BaseEntity
             throw new ArgumentException("Quantity must be positive", nameof(quantity));
 
         var existingItem = _items.FirstOrDefault(i => i.ProductId == product.Id);
-        
+
         if (existingItem != null)
         {
             existingItem.UpdateQuantity(existingItem.Quantity + quantity);

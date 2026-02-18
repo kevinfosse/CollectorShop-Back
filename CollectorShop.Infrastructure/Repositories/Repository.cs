@@ -44,8 +44,8 @@ public class Repository<T> : IRepository<T> where T : BaseEntity
 
     public virtual async Task<int> CountAsync(Expression<Func<T, bool>>? predicate = null, CancellationToken cancellationToken = default)
     {
-        return predicate == null 
-            ? await _dbSet.CountAsync(cancellationToken) 
+        return predicate == null
+            ? await _dbSet.CountAsync(cancellationToken)
             : await _dbSet.CountAsync(predicate, cancellationToken);
     }
 

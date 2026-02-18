@@ -54,6 +54,16 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
         return await _dbSet
             .Include(c => c.WishlistItems)
                 .ThenInclude(w => w.Product)
+                    .ThenInclude(p => p.Images)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
+
+    public async Task<Customer?> GetByUserIdWithWishlistAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Include(c => c.WishlistItems)
+                .ThenInclude(w => w.Product)
+                    .ThenInclude(p => p.Images)
+            .FirstOrDefaultAsync(c => c.UserId == userId, cancellationToken);
     }
 }

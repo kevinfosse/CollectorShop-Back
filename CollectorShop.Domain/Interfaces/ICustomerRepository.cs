@@ -10,4 +10,5 @@ public interface ICustomerRepository : IRepository<Customer>
     Task<Customer?> GetByIdWithAddressesAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Customer?> GetByIdWithCartAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Customer?> GetByIdWithWishlistAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Customer?> GetByUserIdWithWishlistAsync(string userId, CancellationToken cancellationToken = default);
 }

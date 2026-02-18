@@ -1,0 +1,93 @@
+stages:
+  - lint
+  - build
+  - test
+  - security
+  - sonar
+
+variables:
+  DOTNET_VERSION: "9.0"
+  SOLUTION_FILE: "CollectorShopPoc2.sln"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+
+default:
+  image: mcr.microsoft.com/dotnet/sdk:9.0
+  before_script:
+    - dotnet restore $SOLUTION_FILE
+
+# ─────────────────────────────────────────
+# LINT
+# ─────────────────────────────────────────
+lint:format:
+  stage: lint
+  script:
+    - dotnet format $SOLUTION_FILE --verify-no-changes --severity warn
+  allow_failure: false
+
+build:
+  stage: build
+  script:
+    - dotnet build $SOLUTION_FILE --no-restore -c Release /warnaserror
+  artifacts:
+    paths:
+      - "**/bin/Release/"
+    expire_in: 1 hour
+
+test:unit:
+  stage: test
+  script:
+    - dotnet test $SOLUTION_FILE
+        --no-restore
+        --collect:"XPlat Code Coverage"
+        --results-directory ./coverage
+        --logger "junit;LogFilePath=./tests-report.xml"
+  coverage: '/Total\s*\|\s*(\d+(?:\.\d+)?)/'
+  artifacts:
+    when: always
+    reports:
+      junit: tests-report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/**/coverage.cobertura.xml
+    expire_in: 1 week
+
+security:vulnerable-packages:
+  stage: security
+  script:
+    - dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
+    - |
+      if grep -q "has the following vulnerable packages" vulnerable.txt; then
+        echo "⚠️ Vulnerable packages found!"
+        cat vulnerable.txt
+        exit 1
+      fi
+  allow_failure: true
+
+sonar:analysis:
+  stage: sonar
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
+    GIT_DEPTH: "0"
+  cache:
+    key: sonar-cache
+    paths:
+      - .sonar/cache
+  script:
+    - apt-get update && apt-get install -y default-jdk
+    - dotnet tool install --global dotnet-sonarscanner
+    - export PATH="$PATH:/root/.dotnet/tools"
+    - dotnet sonarscanner begin
+        /k:"maalsi-cube3_CollectorShop-Back"
+        /o:"maalsi-cube3"
+        /d:sonar.token="$SONAR_TOKEN"
+        /d:sonar.host.url="$SONAR_HOST_URL"
+        /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.xml"
+    - dotnet build $SOLUTION_FILE --no-restore -c Release
+    - dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+  dependencies:
+    - test:unit
+  only:
+    - main
+    - master
+    - merge_requests

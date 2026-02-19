@@ -167,7 +167,7 @@ public class WishlistController : ControllerBase
         }
 
         // Get or create cart
-        var cart = await _unitOfWork.Carts.GetByCustomerIdAsync(customer.Id);
+        var cart = await _unitOfWork.Carts.GetByCustomerIdWithItemsAsync(customer.Id);
         if (cart == null)
         {
             cart = new Cart(customer.Id);

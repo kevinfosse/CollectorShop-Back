@@ -97,7 +97,8 @@ docker:build:
     - deploy
   image: docker:latest
   services:
-    - docker:dind
+    - name: docker:dind
+    - command: ["--insecure-registry=$NEXUS_REGISTRY"]
   variables:
     DOCKER_TLS_CERTDIR: ""
     PROJECT_NAME: "collectorshop-back"

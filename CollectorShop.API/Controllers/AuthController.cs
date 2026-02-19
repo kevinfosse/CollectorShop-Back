@@ -39,6 +39,21 @@ public class AuthController : ControllerBase
         _configuration = configuration;
     }
 
+    [HttpGet("password-policy")]
+    [AllowAnonymous]
+    public ActionResult<PasswordPolicyResponse> GetPasswordPolicy()
+    {
+        var options = _userManager.Options.Password;
+        return Ok(new PasswordPolicyResponse
+        {
+            MinLength = options.RequiredLength,
+            RequireUppercase = options.RequireUppercase,
+            RequireLowercase = options.RequireLowercase,
+            RequireDigit = options.RequireDigit,
+            RequireNonAlphanumeric = options.RequireNonAlphanumeric
+        });
+    }
+
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {

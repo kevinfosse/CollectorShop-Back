@@ -17,11 +17,13 @@ public class OrdersController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<OrdersController> _logger;
+    private readonly IConfiguration _configuration;
 
-    public OrdersController(IUnitOfWork unitOfWork, ILogger<OrdersController> logger)
+    public OrdersController(IUnitOfWork unitOfWork, ILogger<OrdersController> logger, IConfiguration configuration)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _configuration = configuration;
     }
 
     [HttpGet]
@@ -108,6 +110,64 @@ public class OrdersController : ControllerBase
         return Ok(MapToOrderDto(fullOrder!));
     }
 
+    [HttpPost("preview")]
+    public async Task<ActionResult<OrderPreviewResponse>> PreviewOrder([FromBody] OrderPreviewRequest request)
+    {
+        var customerId = await GetCurrentCustomerIdAsync();
+        if (customerId == null)
+        {
+            return NotFound(new { Message = "Customer profile not found" });
+        }
+
+        var cart = await _unitOfWork.Carts.GetByCustomerIdWithItemsAsync(customerId.Value);
+        if (cart == null || !cart.Items.Any())
+        {
+            return BadRequest(new { Message = "Cart is empty" });
+        }
+
+        var subtotal = cart.Items.Sum(i => i.UnitPrice.Amount * i.Quantity);
+        var currency = cart.Items.First().UnitPrice.Currency;
+        var shippingCost = _configuration.GetValue<decimal>("OrderSettings:DefaultShippingCost", 25m);
+        var taxRate = _configuration.GetValue<decimal>("OrderSettings:TaxRate", 0.20m);
+
+        decimal discountAmount = 0;
+        string? couponMessage = null;
+        bool isCouponValid = false;
+
+        if (!string.IsNullOrEmpty(request.CouponCode))
+        {
+            var coupon = await _unitOfWork.Coupons.GetByCodeAsync(request.CouponCode);
+            if (coupon != null && coupon.IsValid())
+            {
+                var cartSubTotalMoney = new Money(subtotal, currency);
+                discountAmount = coupon.CalculateDiscount(cartSubTotalMoney).Amount;
+                isCouponValid = true;
+                couponMessage = $"Coupon applied: -{discountAmount:F2} {currency}";
+            }
+            else
+            {
+                couponMessage = "Invalid or expired coupon code";
+            }
+        }
+
+        var taxableAmount = subtotal - discountAmount;
+        var taxAmount = taxableAmount * taxRate;
+        var total = taxableAmount + shippingCost + taxAmount;
+
+        return Ok(new OrderPreviewResponse
+        {
+            SubTotal = subtotal,
+            ShippingCost = shippingCost,
+            TaxRate = taxRate,
+            TaxAmount = Math.Round(taxAmount, 2),
+            DiscountAmount = discountAmount,
+            Total = Math.Round(total, 2),
+            Currency = currency,
+            CouponMessage = couponMessage,
+            IsCouponValid = isCouponValid
+        });
+    }
+
     [HttpPost]
     public async Task<ActionResult<OrderDto>> CreateOrder([FromBody] CreateOrderRequest request)
     {
@@ -179,6 +239,14 @@ public class OrdersController : ControllerBase
                 coupon.IncrementUsage();
             }
         }
+
+        // Set shipping and tax from configuration
+        var shippingCost = _configuration.GetValue<decimal>("OrderSettings:DefaultShippingCost", 25m);
+        var taxRate = _configuration.GetValue<decimal>("OrderSettings:TaxRate", 0.20m);
+        var currency = order.SubTotal.Currency;
+        order.SetShippingCost(new Money(shippingCost, currency));
+        var taxableAmount = order.SubTotal.Subtract(order.DiscountAmount);
+        order.SetTaxAmount(new Money(Math.Round(taxableAmount.Amount * taxRate, 2), currency));
 
         // Create payment
         var payment = new Payment(order.Id, order.TotalAmount, request.PaymentMethod);

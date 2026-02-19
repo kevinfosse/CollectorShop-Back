@@ -62,4 +62,11 @@ public class CustomerAddress : BaseEntity
         Label = label;
         UpdatedAt = DateTime.UtcNow;
     }
+
+    public void UpdateFlags(bool isBillingAddress, bool isShippingAddress)
+    {
+        IsBillingAddress = isBillingAddress;
+        IsShippingAddress = isShippingAddress;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }

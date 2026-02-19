@@ -115,8 +115,8 @@ docker:build:
 deploy:k8s:
   stage: deploy
   image: bitnami/kubectl:latest
-    tags:
-      - deploy
+  tags:
+    - deploy
   environment: 
     name: production
     url: "https://172.16.47.13:30083"

@@ -95,7 +95,7 @@ docker:build:
   stage: docker
   tags:
     - deploy
-  image: docker:latest
+  image: docker:20.10
   variables:
     DOCKER_TLS_CERTDIR: ""
     PROJECT_NAME: "collectorshop-back"

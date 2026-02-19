@@ -4,6 +4,7 @@ stages:
   - test
   - security
   - sonar
+  - docker
 
 variables:
   DOTNET_VERSION: "9.0"
@@ -89,3 +90,23 @@ sonar:analysis:
     - main
     - master
     - merge_requests
+
+docker:build:
+  stage: docker
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+    PROJECT_NAME: "collectorshop-back"
+  before_script: []
+  script:
+    - docker login -u $NEXUS_USER -p $NEXUS_PASSWORD $NEXUS_REGISTRY
+    - docker build -t $NEXUS_REGISTRY/$PROJECT_NAME:$CI_COMMIT_SHORT_SHA -t $NEXUS_REGISTRY/$PROJECT_NAME:latest .
+    - docker push $NEXUS_REGISTRY/$PROJECT_NAME:$CI_COMMIT_SHORT_SHA
+    - docker push $NEXUS_REGISTRY/$PROJECT_NAME:latest
+  dependencies:
+    - build
+  only:
+    - main
+    - master

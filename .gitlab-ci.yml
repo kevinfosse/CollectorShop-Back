@@ -5,6 +5,7 @@ stages:
   - security
   - sonar
   - docker
+  - deploy
 
 variables:
   DOTNET_VERSION: "9.0"
@@ -110,3 +111,39 @@ docker:build:
   only:
     - main
     - master
+
+deploy:k8s:
+  stage: deploy
+  image: bitnami/kubectl:latest
+    tags:
+      - deploy
+  environment: 
+    name: production
+    url: "https://172.16.47.13:30083"
+  variables:
+    KUBECONFIG: "$KUBECONFIG_BASE64"
+    KUBE_NAMESPACE: "grpcube3"
+    APP_NAME: "collectorshop-back"
+  script:
+    # ImagePull secret Nexus (persistant)
+    - |
+      kubectl create secret docker-registry nexus-regcred \
+        --docker-server="$NEXUS_REGISTRY" \
+        --docker-username="$NEXUS_USER" \
+        --docker-password="$NEXUS_PASSWORD" \
+        -n "$KUBE_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Patch image + rollout
+    - |
+      IMAGE_FULL="$NEXUS_REGISTRY/$APP_NAME:$CI_COMMIT_SHORT_SHA"
+      kubectl -n "$KUBE_NAMESPACE" set image deployment/"$APP_NAME" "$APP_NAME"="$IMAGE_FULL"
+      kubectl -n "$KUBE_NAMESPACE" rollout status deployment/"$APP_NAME" --timeout=300s
+    
+    # Status
+    - kubectl -n "$KUBE_NAMESPACE" get deployment,pods,svc -l app="$APP_NAME"
+  dependencies:
+    - docker:build
+  only:
+    - main
+    - tags
+  when: manual

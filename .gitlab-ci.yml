@@ -93,6 +93,8 @@ sonar:analysis:
 
 docker:build:
   stage: docker
+  tags:
+    - deploy
   image: docker:latest
   services:
     - docker:dind

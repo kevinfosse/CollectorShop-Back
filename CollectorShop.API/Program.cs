@@ -44,11 +44,55 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
+    var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+    // Seed admin user only when SeedAdmin config section is present (Development only)
+    var seedAdminSection = app.Configuration.GetSection("SeedAdmin");
+    if (seedAdminSection.Exists())
+    {
+        var adminEmail = seedAdminSection["Email"];
+        var adminPassword = seedAdminSection["Password"];
+        var adminFirstName = seedAdminSection["FirstName"] ?? "Admin";
+        var adminLastName = seedAdminSection["LastName"] ?? "CollectorShop";
+
+        if (!string.IsNullOrEmpty(adminEmail) && !string.IsNullOrEmpty(adminPassword))
+        {
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<CollectorShop.Infrastructure.Data.ApplicationUser>>();
+            var adminUser = await userManager.FindByEmailAsync(adminEmail);
+            if (adminUser == null)
+            {
+                adminUser = new CollectorShop.Infrastructure.Data.ApplicationUser
+                {
+                    UserName = adminEmail,
+                    Email = adminEmail,
+                    FirstName = adminFirstName,
+                    LastName = adminLastName,
+                    EmailConfirmed = true,
+                    IsActive = true
+                };
+                var createResult = await userManager.CreateAsync(adminUser, adminPassword);
+                if (createResult.Succeeded)
+                {
+                    await userManager.AddToRolesAsync(adminUser, new[] { "Admin", "Customer", "Manager" });
+
+                    var adminCustomer = new Customer(adminFirstName, adminLastName, new Email(adminEmail), adminUser.Id);
+                    await unitOfWork.Customers.AddAsync(adminCustomer);
+                    await unitOfWork.SaveChangesAsync();
+
+                    Log.Information("Seeded admin user {Email} with all roles", adminEmail);
+                }
+                else
+                {
+                    Log.Warning("Failed to seed admin user: {Errors}", string.Join(", ", createResult.Errors.Select(e => e.Description)));
+                }
+            }
+        }
+    }
+
     // Seed a Customer profile for the DevAuth user so cart/wishlist work in dev mode
     var bypassAuth = app.Configuration.GetValue<bool>("BypassAuth");
     if (bypassAuth)
     {
-        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
         var existingCustomer = await unitOfWork.Customers.GetByUserIdAsync("dev-user-id");
         if (existingCustomer == null)
         {

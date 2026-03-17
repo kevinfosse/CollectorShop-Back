@@ -4,7 +4,9 @@ using CollectorShop.Domain.Entities;
 using CollectorShop.Domain.Interfaces;
 using CollectorShop.Domain.ValueObjects;
 using CollectorShop.Infrastructure;
+using CollectorShop.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,6 +30,14 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<CollectorShop.Infrastructure.Data.ApplicationDbContext>("database");
 
 var app = builder.Build();
+
+// Apply migrations
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await dbContext.Database.MigrateAsync();
+    Log.Information("Database migrations applied successfully");
+}
 
 // Seed roles
 using (var scope = app.Services.CreateScope())

@@ -45,6 +45,7 @@ public class ProductsController : ControllerBase
             Price = p.Price.Amount,
             Currency = p.Price.Currency,
             CompareAtPrice = p.CompareAtPrice?.Amount,
+            DiscountPercentage = CalculateDiscountPercentage(p.Price.Amount, p.CompareAtPrice?.Amount),
             AvailableQuantity = p.AvailableQuantity,
             IsActive = p.IsActive,
             IsFeatured = p.IsFeatured,
@@ -109,6 +110,7 @@ public class ProductsController : ControllerBase
             Price = p.Price.Amount,
             Currency = p.Price.Currency,
             CompareAtPrice = p.CompareAtPrice?.Amount,
+            DiscountPercentage = CalculateDiscountPercentage(p.Price.Amount, p.CompareAtPrice?.Amount),
             AvailableQuantity = p.AvailableQuantity,
             IsActive = p.IsActive,
             IsFeatured = p.IsFeatured,
@@ -132,6 +134,7 @@ public class ProductsController : ControllerBase
             Price = p.Price.Amount,
             Currency = p.Price.Currency,
             CompareAtPrice = p.CompareAtPrice?.Amount,
+            DiscountPercentage = CalculateDiscountPercentage(p.Price.Amount, p.CompareAtPrice?.Amount),
             AvailableQuantity = p.AvailableQuantity,
             IsActive = p.IsActive,
             IsFeatured = p.IsFeatured,
@@ -283,6 +286,12 @@ public class ProductsController : ControllerBase
         return Ok(new { product.StockQuantity, product.AvailableQuantity });
     }
 
+    private static int? CalculateDiscountPercentage(decimal price, decimal? compareAtPrice)
+    {
+        if (compareAtPrice == null || compareAtPrice <= price) return null;
+        return (int)Math.Round((compareAtPrice.Value - price) / compareAtPrice.Value * 100);
+    }
+
     private static ProductDto MapToProductDto(Product product, double averageRating, int reviewCount)
     {
         return new ProductDto
@@ -294,6 +303,7 @@ public class ProductsController : ControllerBase
             Price = product.Price.Amount,
             Currency = product.Price.Currency,
             CompareAtPrice = product.CompareAtPrice?.Amount,
+            DiscountPercentage = CalculateDiscountPercentage(product.Price.Amount, product.CompareAtPrice?.Amount),
             StockQuantity = product.StockQuantity,
             AvailableQuantity = product.AvailableQuantity,
             IsActive = product.IsActive,

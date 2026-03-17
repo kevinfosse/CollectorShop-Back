@@ -25,4 +25,8 @@
     <ProjectReference Include="..\CollectorShop.Domain\CollectorShop.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Data\Seeding\SeedData\*.json" />
+  </ItemGroup>
+
 </Project>

@@ -32,6 +32,14 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
             .HasForeignKey(c => c.ParentCategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Navigation(c => c.SubCategories)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_subCategories");
+
+        builder.Navigation(c => c.Products)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_products");
+
         builder.HasIndex(c => c.ParentCategoryId);
         builder.HasIndex(c => c.IsActive);
         builder.HasIndex(c => c.DisplayOrder);

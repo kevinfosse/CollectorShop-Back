@@ -1,0 +1,52 @@
+[
+  {
+    "id": "6efa80dd-467f-4fa9-bfab-197c66b5f9a1",
+    "name": "Figurines",
+    "description": "Figurines de collection et statues",
+    "slug": "figurines",
+    "imageUrl": null,
+    "displayOrder": 1,
+    "isActive": true,
+    "parentCategoryId": null
+  },
+  {
+    "id": "9a2913f4-fbe5-4f0a-ba5a-873d68e6924c",
+    "name": "Comics",
+    "description": "Bandes dessinees et comics de collection",
+    "slug": "comics",
+    "imageUrl": null,
+    "displayOrder": 2,
+    "isActive": true,
+    "parentCategoryId": null
+  },
+  {
+    "id": "b04e3561-3401-4232-b683-eb21d76985a0",
+    "name": "Cartes a collectionner",
+    "description": "Cartes a collectionner et TCG",
+    "slug": "cartes",
+    "imageUrl": null,
+    "displayOrder": 3,
+    "isActive": true,
+    "parentCategoryId": null
+  },
+  {
+    "id": "a1b2c3d4-1111-4000-a000-000000000001",
+    "name": "Jeux video retro",
+    "description": "Consoles et jeux video vintage et retro",
+    "slug": "retro-gaming",
+    "imageUrl": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400",
+    "displayOrder": 4,
+    "isActive": true,
+    "parentCategoryId": null
+  },
+  {
+    "id": "a1b2c3d4-2222-4000-a000-000000000002",
+    "name": "Vinyles",
+    "description": "Disques vinyles rares et editions limitees",
+    "slug": "vinyl",
+    "imageUrl": "https://images.unsplash.com/photo-1539375665275-f9de415ef9ac?w=400",
+    "displayOrder": 5,
+    "isActive": true,
+    "parentCategoryId": null
+  }
+]

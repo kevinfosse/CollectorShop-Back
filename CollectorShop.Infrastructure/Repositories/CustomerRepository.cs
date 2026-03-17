@@ -54,6 +54,42 @@ public class CustomerRepository : Repository<Customer>, ICustomerRepository
         return await _dbSet
             .Include(c => c.WishlistItems)
                 .ThenInclude(w => w.Product)
+                    .ThenInclude(p => p.Images)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
+
+    public async Task<Customer?> GetByUserIdWithWishlistAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Include(c => c.WishlistItems)
+                .ThenInclude(w => w.Product)
+                    .ThenInclude(p => p.Images)
+            .FirstOrDefaultAsync(c => c.UserId == userId, cancellationToken);
+    }
+
+    // Customer address operations
+    public async Task<List<CustomerAddress>> GetAddressesByCustomerIdAsync(Guid customerId, CancellationToken cancellationToken = default)
+    {
+        return await _context.CustomerAddresses
+            .Where(ca => ca.CustomerId == customerId)
+            .OrderByDescending(ca => ca.IsDefault)
+            .ThenBy(ca => ca.Label)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<CustomerAddress?> GetAddressByIdAsync(Guid addressId, CancellationToken cancellationToken = default)
+    {
+        return await _context.CustomerAddresses
+            .FirstOrDefaultAsync(ca => ca.Id == addressId, cancellationToken);
+    }
+
+    public async Task AddAddressAsync(CustomerAddress address, CancellationToken cancellationToken = default)
+    {
+        await _context.CustomerAddresses.AddAsync(address, cancellationToken);
+    }
+
+    public void RemoveAddress(CustomerAddress address)
+    {
+        _context.CustomerAddresses.Remove(address);
     }
 }

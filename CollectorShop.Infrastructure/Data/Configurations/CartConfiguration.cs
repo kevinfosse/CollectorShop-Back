@@ -15,6 +15,10 @@ public class CartConfiguration : IEntityTypeConfiguration<Cart>
             .HasForeignKey(i => i.CartId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Navigation(c => c.Items)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_items");
+
         builder.HasIndex(c => c.CustomerId)
             .IsUnique();
 

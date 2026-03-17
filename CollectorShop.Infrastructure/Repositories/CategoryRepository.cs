@@ -13,7 +13,9 @@ public class CategoryRepository : Repository<Category>, ICategoryRepository
 
     public async Task<Category?> GetBySlugAsync(string slug, CancellationToken cancellationToken = default)
     {
-        return await _dbSet.FirstOrDefaultAsync(c => c.Slug == slug, cancellationToken);
+        return await _dbSet
+            .Include(c => c.Products.Where(p => p.IsActive))
+            .FirstOrDefaultAsync(c => c.Slug == slug, cancellationToken);
     }
 
     public async Task<Category?> GetByIdWithProductsAsync(Guid id, CancellationToken cancellationToken = default)
@@ -34,6 +36,7 @@ public class CategoryRepository : Repository<Category>, ICategoryRepository
     public async Task<IReadOnlyList<Category>> GetSubCategoriesAsync(Guid parentId, CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .Include(c => c.Products.Where(p => p.IsActive))
             .Where(c => c.ParentCategoryId == parentId && c.IsActive)
             .OrderBy(c => c.DisplayOrder)
             .ToListAsync(cancellationToken);
@@ -42,6 +45,7 @@ public class CategoryRepository : Repository<Category>, ICategoryRepository
     public async Task<IReadOnlyList<Category>> GetActiveCategoriesAsync(CancellationToken cancellationToken = default)
     {
         return await _dbSet
+            .Include(c => c.Products.Where(p => p.IsActive))
             .Where(c => c.IsActive)
             .OrderBy(c => c.DisplayOrder)
             .ToListAsync(cancellationToken);

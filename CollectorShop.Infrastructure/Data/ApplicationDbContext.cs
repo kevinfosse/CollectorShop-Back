@@ -54,6 +54,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 var lambda = System.Linq.Expressions.Expression.Lambda(filterExpression, parameter);
 
                 builder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+
+                // Ids are always generated client-side (Guid.NewGuid() in BaseEntity),
+                // not by the database. Without this, EF treats untracked entities
+                // discovered in navigation collections as Modified (UPDATE) instead of
+                // Added (INSERT) when their key is non-empty, causing
+                // DbUpdateConcurrencyException ("expected 1 row, affected 0").
+                builder.Entity(entityType.ClrType)
+                    .Property(nameof(BaseEntity.Id))
+                    .ValueGeneratedNever();
             }
         }
     }

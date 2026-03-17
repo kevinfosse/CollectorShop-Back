@@ -116,3 +116,22 @@ public class OrderFilterRequest
     public string? SortBy { get; set; }
     public bool SortDescending { get; set; }
 }
+
+public class OrderPreviewRequest
+{
+    public string? CouponCode { get; set; }
+    public string? ShippingCountry { get; set; }
+}
+
+public class OrderPreviewResponse
+{
+    public decimal SubTotal { get; set; }
+    public decimal ShippingCost { get; set; }
+    public decimal TaxRate { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal Total { get; set; }
+    public string Currency { get; set; } = "USD";
+    public string? CouponMessage { get; set; }
+    public bool IsCouponValid { get; set; }
+}

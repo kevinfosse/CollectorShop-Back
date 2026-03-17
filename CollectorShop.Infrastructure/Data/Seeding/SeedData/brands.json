@@ -1,0 +1,56 @@
+[
+  {
+    "id": "b1a2c3d4-0001-4000-b000-000000000001",
+    "name": "Bandai Namco",
+    "description": "Fabricant japonais de figurines et jouets",
+    "slug": "bandai",
+    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Bandai_Namco_Holdings_logo.svg/200px-Bandai_Namco_Holdings_logo.svg.png",
+    "websiteUrl": "https://www.bandai.com",
+    "isActive": true
+  },
+  {
+    "id": "b1a2c3d4-0002-4000-b000-000000000002",
+    "name": "Funko",
+    "description": "Createur de figurines Pop! et objets de collection",
+    "slug": "funko",
+    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Funko_logo.svg/200px-Funko_logo.svg.png",
+    "websiteUrl": "https://www.funko.com",
+    "isActive": true
+  },
+  {
+    "id": "b1a2c3d4-0003-4000-b000-000000000003",
+    "name": "The Pokemon Company",
+    "description": "Editeur officiel des cartes et produits Pokemon",
+    "slug": "pokemon-company",
+    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/98/International_Pok%C3%A9mon_logo.svg/200px-International_Pok%C3%A9mon_logo.svg.png",
+    "websiteUrl": "https://www.pokemon.com",
+    "isActive": true
+  },
+  {
+    "id": "b1a2c3d4-0004-4000-b000-000000000004",
+    "name": "Nintendo",
+    "description": "Entreprise japonaise de jeux video et consoles",
+    "slug": "nintendo",
+    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Nintendo.svg/200px-Nintendo.svg.png",
+    "websiteUrl": "https://www.nintendo.com",
+    "isActive": true
+  },
+  {
+    "id": "b1a2c3d4-0005-4000-b000-000000000005",
+    "name": "Marvel",
+    "description": "Univers Marvel - Comics et produits derives",
+    "slug": "marvel",
+    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Marvel_Logo.svg/200px-Marvel_Logo.svg.png",
+    "websiteUrl": "https://www.marvel.com",
+    "isActive": true
+  },
+  {
+    "id": "b1a2c3d4-0006-4000-b000-000000000006",
+    "name": "Sony",
+    "description": "Geant de l electronique et du jeu video",
+    "slug": "sony",
+    "logoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Sony_logo.svg/200px-Sony_logo.svg.png",
+    "websiteUrl": "https://www.sony.com",
+    "isActive": true
+  }
+]

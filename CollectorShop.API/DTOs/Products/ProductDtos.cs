@@ -11,6 +11,7 @@ public class ProductDto
     public decimal Price { get; set; }
     public string Currency { get; set; } = "USD";
     public decimal? CompareAtPrice { get; set; }
+    public int? DiscountPercentage { get; set; }
     public int StockQuantity { get; set; }
     public int AvailableQuantity { get; set; }
     public bool IsActive { get; set; }
@@ -38,6 +39,7 @@ public class ProductListDto
     public decimal Price { get; set; }
     public string Currency { get; set; } = "USD";
     public decimal? CompareAtPrice { get; set; }
+    public int? DiscountPercentage { get; set; }
     public int AvailableQuantity { get; set; }
     public bool IsActive { get; set; }
     public bool IsFeatured { get; set; }

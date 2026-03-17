@@ -134,6 +134,10 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasForeignKey(i => i.OrderId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.Navigation(o => o.Items)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .HasField("_items");
+
         builder.HasOne(o => o.Payment)
             .WithOne(p => p.Order)
             .HasForeignKey<Payment>(p => p.OrderId)

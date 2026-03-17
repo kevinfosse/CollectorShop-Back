@@ -3,6 +3,7 @@ using CollectorShop.Domain.Entities;
 using CollectorShop.Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace CollectorShop.API.Controllers;
@@ -28,7 +29,7 @@ public class WishlistController : ControllerBase
             return Unauthorized();
         }
 
-        var customer = await _unitOfWork.Customers.GetByUserIdAsync(userId);
+        var customer = await _unitOfWork.Customers.GetByUserIdWithWishlistAsync(userId);
         if (customer == null)
         {
             return NotFound("Customer profile not found");
@@ -60,7 +61,7 @@ public class WishlistController : ControllerBase
             return Unauthorized();
         }
 
-        var customer = await _unitOfWork.Customers.GetByUserIdAsync(userId);
+        var customer = await _unitOfWork.Customers.GetByUserIdWithWishlistAsync(userId);
         if (customer == null)
         {
             return NotFound("Customer profile not found");
@@ -80,7 +81,16 @@ public class WishlistController : ControllerBase
 
         var wishlistItem = new WishlistItem(customer.Id, request.ProductId);
         customer.AddToWishlist(wishlistItem);
-        await _unitOfWork.SaveChangesAsync();
+
+        try
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Handle race condition: item was added between the check and the insert
+            return Conflict("Product is already in your wishlist");
+        }
 
         return CreatedAtAction(nameof(GetWishlist), new WishlistItemDto
         {
@@ -106,7 +116,7 @@ public class WishlistController : ControllerBase
             return Unauthorized();
         }
 
-        var customer = await _unitOfWork.Customers.GetByUserIdAsync(userId);
+        var customer = await _unitOfWork.Customers.GetByUserIdWithWishlistAsync(userId);
         if (customer == null)
         {
             return NotFound("Customer profile not found");
@@ -133,7 +143,7 @@ public class WishlistController : ControllerBase
             return Unauthorized();
         }
 
-        var customer = await _unitOfWork.Customers.GetByUserIdAsync(userId);
+        var customer = await _unitOfWork.Customers.GetByUserIdWithWishlistAsync(userId);
         if (customer == null)
         {
             return NotFound("Customer profile not found");
@@ -157,7 +167,7 @@ public class WishlistController : ControllerBase
         }
 
         // Get or create cart
-        var cart = await _unitOfWork.Carts.GetByCustomerIdAsync(customer.Id);
+        var cart = await _unitOfWork.Carts.GetByCustomerIdWithItemsAsync(customer.Id);
         if (cart == null)
         {
             cart = new Cart(customer.Id);

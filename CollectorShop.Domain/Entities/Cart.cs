@@ -28,7 +28,8 @@ public class Cart : BaseEntity
             if (!_items.Any())
                 return Money.Zero();
 
-            return _items.Aggregate(Money.Zero(), (total, item) => total.Add(item.TotalPrice));
+            var currency = _items.First().TotalPrice.Currency;
+            return _items.Aggregate(Money.Zero(currency), (total, item) => total.Add(item.TotalPrice));
         }
     }
 

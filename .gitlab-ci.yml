@@ -216,9 +216,8 @@ deploy:azure:
   script:
     - apt-get update && apt-get install -y openssh-client
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - cat "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    - printf "%s\n" "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - ssh-keygen -y -f ~/.ssh/id_rsa > /dev/null || (echo "Key validation failed" && cat -A ~/.ssh/id_rsa && exit 1)
     - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
     - ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_rsa ${SSH_USER}@${SSH_HOST} "set -e && echo '${CI_REGISTRY_PASSWORD}' | docker login -u '${CI_REGISTRY_USER}' --password-stdin ${CI_REGISTRY} && cd /opt/services/apps && docker compose pull collectorshop-back && docker compose up -d collectorshop-back && docker image prune -f"

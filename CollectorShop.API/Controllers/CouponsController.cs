@@ -100,7 +100,7 @@ public class CouponsController : ControllerBase
             });
         }
 
-        var orderAmount = new Money(request.OrderAmount, "USD");
+        var orderAmount = new Money(request.OrderAmount, "EUR");
 
         if (coupon.MinimumOrderAmount != null && orderAmount.Amount < coupon.MinimumOrderAmount.Amount)
         {
@@ -136,8 +136,8 @@ public class CouponsController : ControllerBase
             request.Description,
             request.Type,
             request.Value,
-            request.MinimumOrderAmount.HasValue ? new Money(request.MinimumOrderAmount.Value, "USD") : null,
-            request.MaximumDiscountAmount.HasValue ? new Money(request.MaximumDiscountAmount.Value, "USD") : null
+            request.MinimumOrderAmount.HasValue ? new Money(request.MinimumOrderAmount.Value, "EUR") : null,
+            request.MaximumDiscountAmount.HasValue ? new Money(request.MaximumDiscountAmount.Value, "EUR") : null
         );
 
         coupon.SetUsageLimit(request.UsageLimit);

@@ -12,7 +12,7 @@ public class Money : ValueObject
         Currency = null!;
     }
 
-    public Money(decimal amount, string currency = "USD")
+    public Money(decimal amount, string currency = "EUR")
     {
         if (amount < 0)
             throw new ArgumentException("Amount cannot be negative", nameof(amount));
@@ -24,7 +24,7 @@ public class Money : ValueObject
         Currency = currency.ToUpperInvariant();
     }
 
-    public static Money Zero(string currency = "USD") => new Money(0, currency);
+    public static Money Zero(string currency = "EUR") => new Money(0, currency);
 
     public Money Add(Money other)
     {

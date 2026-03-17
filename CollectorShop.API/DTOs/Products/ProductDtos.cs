@@ -9,7 +9,7 @@ public class ProductDto
     public string Description { get; set; } = string.Empty;
     public string Sku { get; set; } = string.Empty;
     public decimal Price { get; set; }
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "EUR";
     public decimal? CompareAtPrice { get; set; }
     public int? DiscountPercentage { get; set; }
     public int StockQuantity { get; set; }
@@ -37,7 +37,7 @@ public class ProductListDto
     public string Name { get; set; } = string.Empty;
     public string Sku { get; set; } = string.Empty;
     public decimal Price { get; set; }
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "EUR";
     public decimal? CompareAtPrice { get; set; }
     public int? DiscountPercentage { get; set; }
     public int AvailableQuantity { get; set; }
@@ -56,7 +56,7 @@ public class CreateProductRequest
     public string Description { get; set; } = string.Empty;
     public string Sku { get; set; } = string.Empty;
     public decimal Price { get; set; }
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "EUR";
     public decimal? CompareAtPrice { get; set; }
     public int StockQuantity { get; set; }
     public ProductCondition Condition { get; set; } = ProductCondition.New;
@@ -74,7 +74,7 @@ public class UpdateProductRequest
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public decimal Price { get; set; }
-    public string Currency { get; set; } = "USD";
+    public string Currency { get; set; } = "EUR";
     public decimal? CompareAtPrice { get; set; }
     public int StockQuantity { get; set; }
     public ProductCondition Condition { get; set; }

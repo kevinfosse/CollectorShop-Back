@@ -82,8 +82,7 @@ public class CartController : ControllerBase
 
         _logger.LogInformation("Added product {ProductId} to cart for customer {CustomerId}", request.ProductId, customerId);
 
-        var updatedCart = await _unitOfWork.Carts.GetByCustomerIdWithItemsAsync(customerId.Value);
-        return Ok(MapToCartDto(updatedCart!));
+        return Ok(MapToCartDto(cart));
     }
 
     [HttpPut("items/{productId:guid}")]
@@ -113,8 +112,7 @@ public class CartController : ControllerBase
         _logger.LogInformation("Updated cart item {ProductId} quantity to {Quantity} for customer {CustomerId}",
             productId, request.Quantity, customerId);
 
-        var updatedCart = await _unitOfWork.Carts.GetByCustomerIdWithItemsAsync(customerId.Value);
-        return Ok(MapToCartDto(updatedCart!));
+        return Ok(MapToCartDto(cart));
     }
 
     [HttpDelete("items/{productId:guid}")]
@@ -137,8 +135,7 @@ public class CartController : ControllerBase
 
         _logger.LogInformation("Removed product {ProductId} from cart for customer {CustomerId}", productId, customerId);
 
-        var updatedCart = await _unitOfWork.Carts.GetByCustomerIdWithItemsAsync(customerId.Value);
-        return Ok(MapToCartDto(updatedCart!));
+        return Ok(MapToCartDto(cart));
     }
 
     [HttpDelete]

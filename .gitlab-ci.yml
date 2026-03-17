@@ -208,30 +208,19 @@ deploy:k8s:
 # Deploy to Azure VM (maalsikube.dev)
 deploy:azure:
   stage: deploy
-  image: alpine:latest
+  image: ubuntu:24.04
   needs:
     - docker:gitlab
     - trivy:scan
   before_script: []
   script:
-    - apk add --no-cache openssh-client
+    - apt-get update && apt-get install -y openssh-client
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - echo "=== DEBUG ==="
-    - cat "$SSH_PRIVATE_KEY"
     - cp "$SSH_PRIVATE_KEY" ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
-    - ssh -v -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_rsa ${SSH_USER}@${SSH_HOST} "set -e && echo '${CI_REGISTRY_PASSWORD}' | docker login -u '${CI_REGISTRY_USER}' --password-stdin ${CI_REGISTRY} && cd /opt/services/apps && docker compose pull collectorshop-back && docker compose up -d collectorshop-back && docker image prune -f"
-        ssh -v -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_rsa "${SSH_USER}@${SSH_HOST}"
-        "set -e &&
-        echo '${CI_REGISTRY_PASSWORD}' | docker login -u '${CI_REGISTRY_USER}' --password-stdin ${CI_REGISTRY} &&
-        cd /opt/services/apps &&
-        docker compose pull collectorshop-back &&
-        docker compose up -d collectorshop-back &&
-        test \"\$(docker inspect -f '{{.State.Health.Status}}' mssql)\" = \"healthy\" &&
-        test \"\$(docker inspect -f '{{.State.Running}}' collectorshop-back)\" = \"true\" &&
-        docker image prune -f"
+    - ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_rsa ${SSH_USER}@${SSH_HOST} "set -e && echo '${CI_REGISTRY_PASSWORD}' | docker login -u '${CI_REGISTRY_USER}' --password-stdin ${CI_REGISTRY} && cd /opt/services/apps && docker compose pull collectorshop-back && docker compose up -d collectorshop-back && docker image prune -f"
   environment:
     name: production
     url: https://api.maalsikube.dev

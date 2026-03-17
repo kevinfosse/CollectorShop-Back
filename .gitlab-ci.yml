@@ -8,31 +8,37 @@ stages:
   - deploy
 
 variables:
-  DOTNET_VERSION: "9.0"
-  SOLUTION_FILE: "CollectorShopPoc2.sln"
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
-  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_VERSION: '9.0'
+  SOLUTION_FILE: 'CollectorShopPoc2.sln'
+  PROJECT_NAME: 'collectorshop-back'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  IMAGE_NAME: $CI_REGISTRY_IMAGE
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
 
 default:
   image: mcr.microsoft.com/dotnet/sdk:9.0
   before_script:
     - dotnet restore $SOLUTION_FILE
 
+# ── Stage 1: Lint ──────────────────────────────────────────
 lint:format:
   stage: lint
   script:
     - dotnet format $SOLUTION_FILE --verify-no-changes --severity warn
   allow_failure: false
 
+# ── Stage 2: Build ─────────────────────────────────────────
 build:
   stage: build
   script:
     - dotnet build $SOLUTION_FILE --no-restore -c Release /warnaserror
   artifacts:
     paths:
-      - "**/bin/Release/"
+      - '**/bin/Release/'
     expire_in: 1 hour
 
+# ── Stage 3: Test ──────────────────────────────────────────
 test:unit:
   stage: test
   script:
@@ -52,6 +58,7 @@ test:unit:
     expire_in: 1 week
   allow_failure: false
 
+# ── Stage 4: Security ─────────────────────────────────────
 security:vulnerable-packages:
   stage: security
   script:
@@ -64,11 +71,12 @@ security:vulnerable-packages:
       fi
   allow_failure: false
 
+# ── Stage 5: SonarCloud ───────────────────────────────────
 sonar:analysis:
   stage: sonar
   variables:
-    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"
-    GIT_DEPTH: "0"
+    SONAR_USER_HOME: '${CI_PROJECT_DIR}/.sonar'
+    GIT_DEPTH: '0'
   cache:
     key: sonar-cache
     paths:
@@ -78,28 +86,34 @@ sonar:analysis:
     - dotnet tool install --global dotnet-sonarscanner
     - export PATH="$PATH:/root/.dotnet/tools"
     - dotnet sonarscanner begin
-        /k:"maalsi-cube3_CollectorShop-Back"
-        /o:"maalsi-cube3"
-        /d:sonar.token="$SONAR_TOKEN"
-        /d:sonar.host.url="$SONAR_HOST_URL"
-        /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.xml"
+      /k:"maalsi-cube3_CollectorShop-Back"
+      /o:"maalsi-cube3"
+      /d:sonar.token="$SONAR_TOKEN"
+      /d:sonar.host.url="$SONAR_HOST_URL"
+      /d:sonar.cs.opencover.reportsPaths="coverage/**/coverage.opencover.xml"
     - dotnet build $SOLUTION_FILE --no-restore -c Release
     - dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
   dependencies:
     - test:unit
-  only:
-    - main
-    - master
-    - merge_requests
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: false
 
-docker:build:
+# ════════════════════════════════════════════════════════════
+# DOCKER STAGE — Nexus (school K8s) + GitLab Registry (Azure)
+# ════════════════════════════════════════════════════════════
+
+# Push to Nexus registry (school/K8s infra)
+docker:nexus:
   stage: docker
+  image: docker:27
+  services:
+    - docker:27-dind
   tags:
     - deploy
-  image: docker:20.10
   variables:
-    DOCKER_TLS_CERTDIR: ""
-    PROJECT_NAME: "collectorshop-back"
+    DOCKER_TLS_CERTDIR: ''
   before_script: []
   script:
     - docker login -u $NEXUS_USER -p $NEXUS_PASSWORD $NEXUS_REGISTRY
@@ -108,43 +122,114 @@ docker:build:
     - docker push $NEXUS_REGISTRY/$PROJECT_NAME:latest
   dependencies:
     - build
-  only:
-    - main
-    - master
-    - tags
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
 
+# Push to GitLab Container Registry (Azure VM)
+docker:gitlab:
+  stage: docker
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: '/certs'
+  before_script: []
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest .
+    - docker push $IMAGE_NAME:$IMAGE_TAG
+    - docker push $IMAGE_NAME:latest
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_TAG
+
+# Trivy CVE scan on GitLab Registry image
+trivy:scan:
+  stage: docker
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: ['']
+  needs:
+    - docker:gitlab
+  before_script: []
+  script:
+    - >
+      trivy image
+      --exit-code 1
+      --severity CRITICAL
+      --username $CI_REGISTRY_USER
+      --password $CI_REGISTRY_PASSWORD
+      $IMAGE_NAME:$IMAGE_TAG
+  allow_failure: false
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_TAG
+
+# ════════════════════════════════════════════════════════════
+# DEPLOY STAGE — Both targets
+# ════════════════════════════════════════════════════════════
+
+# Deploy to school K8s cluster
 deploy:k8s:
   stage: deploy
   image: bitnami/kubectl:latest
   tags:
     - deploy
-  environment: 
-    name: production
-    url: "https://172.16.47.13:30083"
+  environment:
+    name: school
+    url: 'https://172.16.47.13:30083'
   variables:
-    KUBECONFIG: "$KUBECONFIG_BASE64"
-    KUBE_NAMESPACE: "grpcube3"
-    APP_NAME: "collectorshop-back"
+    KUBECONFIG: '$KUBECONFIG_BASE64'
+    KUBE_NAMESPACE: 'grpcube3'
+    APP_NAME: 'collectorshop-back'
+  before_script: []
   script:
-    # ImagePull secret Nexus (persistant)
     - |
       kubectl create secret docker-registry nexus-regcred \
         --docker-server="$NEXUS_REGISTRY" \
         --docker-username="$NEXUS_USER" \
         --docker-password="$NEXUS_PASSWORD" \
         -n "$KUBE_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-    
-    # Patch image + rollout
     - |
       IMAGE_FULL="$NEXUS_REGISTRY/$APP_NAME:$CI_COMMIT_SHORT_SHA"
       kubectl -n "$KUBE_NAMESPACE" set image deployment/"$APP_NAME" "$APP_NAME"="$IMAGE_FULL"
       kubectl -n "$KUBE_NAMESPACE" rollout status deployment/"$APP_NAME" --timeout=300s
-    
-    # Status
     - kubectl -n "$KUBE_NAMESPACE" get deployment,pods,svc -l app="$APP_NAME"
   dependencies:
-    - docker:build
-  only:
-    - main
-    - tags
-  when: manual
+    - docker:nexus
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_COMMIT_TAG
+      when: manual
+
+# Deploy to Azure VM (maalsikube.dev)
+deploy:azure:
+  stage: deploy
+  image: alpine:latest
+  needs:
+    - docker:gitlab
+    - trivy:scan
+  before_script: []
+  script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - |
+      ssh $SSH_USER@$SSH_HOST "
+        docker login -u '${CI_REGISTRY_USER}' -p '${CI_REGISTRY_PASSWORD}' ${CI_REGISTRY} &&
+        cd /opt/services/apps &&
+        docker compose pull collectorshop-back &&
+        docker compose up -d collectorshop-back &&
+        docker image prune -f
+      "
+  environment:
+    name: production
+    url: https://api.maalsikube.dev
+  rules:
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: manual

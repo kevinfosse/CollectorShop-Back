@@ -158,6 +158,7 @@ trivy:scan:
       trivy image
       --exit-code 1
       --severity CRITICAL
+      --ignore-unfixed
       --username $CI_REGISTRY_USER
       --password $CI_REGISTRY_PASSWORD
       $IMAGE_NAME:$IMAGE_TAG

@@ -195,6 +195,7 @@ jobs:
     runs-on: self-hosted
     needs: [lint, build, test, security]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -210,8 +211,9 @@ jobs:
   # ── Stage 10: Deploy to K8s ───────────────────────────────
   deploy-k8s:
     runs-on: self-hosted
-    needs: docker-nexus
+    needs: [trivy]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    continue-on-error: true
     environment: school
     env:
       KUBE_NAMESPACE: 'grpcube3'

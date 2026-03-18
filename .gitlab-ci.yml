@@ -231,7 +231,7 @@ deploy:azure:
       echo '${CI_REGISTRY_PASSWORD}' | docker login -u '${CI_REGISTRY_USER}' --password-stdin ${CI_REGISTRY} &&
       cd /opt/services/apps &&
       docker compose pull collectorshop-back &&
-      docker compose up -d collectorshop-back &&
+      docker compose up -d --no-deps collectorshop-back &&
       test \"\$(docker inspect -f '{{.State.Running}}' collectorshop-back)\" = \"true\" &&
       docker image prune -f
       "

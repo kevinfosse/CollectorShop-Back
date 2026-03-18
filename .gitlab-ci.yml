@@ -183,13 +183,15 @@ deploy:k8s:
     name: school
     url: 'https://172.16.47.13:30083'
   variables:
-    KUBECONFIG: '$KUBECONFIG_BASE64'
     KUBE_NAMESPACE: 'grpcube3'
     APP_NAME: 'collectorshop-back'
-  before_script: 
-    - echo "$KUBECONFIG_BASE64" | base64 -d > /tmp/kubeconfig
-    - export KUBECONFIG=/tmp/kubeconfig
+  before_script:
+    - mkdir -p /tmp/.kube
+    - echo "$KUBECONFIG_BASE64" | base64 -d > /tmp/.kube/config
+    - chmod 600 /tmp/.kube/config
+    - export KUBECONFIG=/tmp/.kube/config
   script:
+    - export KUBECONFIG=/tmp/.kube/config
     - |
       kubectl create secret docker-registry nexus-regcred \
         --docker-server="$NEXUS_REGISTRY" \
@@ -212,20 +214,27 @@ deploy:k8s:
 # Deploy to Azure VM (maalsikube.dev)
 deploy:azure:
   stage: deploy
-  image: ubuntu:24.04
+  image: alpine:latest
   needs:
     - docker:gitlab
     - trivy:scan
   before_script: []
   script:
-    - apt-get update && apt-get install -y openssh-client
+    - apk add --no-cache openssh-client
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - printf "%s\n" "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+    - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
-    - echo "=== Key fingerprint ===" && ssh-keygen -lf ~/.ssh/id_rsa
     - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
-    - ssh -v -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_rsa ${SSH_USER}@${SSH_HOST} "echo SUCCESS"
+    - ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id_rsa "${SSH_USER}@${SSH_HOST}" "
+      set -e &&
+      echo '${CI_REGISTRY_PASSWORD}' | docker login -u '${CI_REGISTRY_USER}' --password-stdin ${CI_REGISTRY} &&
+      cd /opt/services/apps &&
+      docker compose pull collectorshop-back &&
+      docker compose up -d collectorshop-back &&
+      test \"\$(docker inspect -f '{{.State.Running}}' collectorshop-back)\" = \"true\" &&
+      docker image prune -f
+      "
   environment:
     name: production
     url: https://api.maalsikube.dev

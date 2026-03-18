@@ -186,7 +186,9 @@ deploy:k8s:
     KUBECONFIG: '$KUBECONFIG_BASE64'
     KUBE_NAMESPACE: 'grpcube3'
     APP_NAME: 'collectorshop-back'
-  before_script: []
+  before_script: 
+    - echo "$KUBECONFIG_BASE64" | base64 -d > /tmp/kubeconfig
+    - export KUBECONFIG=/tmp/kubeconfig
   script:
     - |
       kubectl create secret docker-registry nexus-regcred \

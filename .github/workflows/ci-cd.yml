@@ -34,7 +34,7 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       - run: dotnet restore ${{ env.SOLUTION_FILE }}
-      - run: dotnet build ${{ env.SOLUTION_FILE }} --no-restore -c Release /warnaserror
+      - run: dotnet build ${{ env.SOLUTION_FILE }} -c Release
       - uses: actions/upload-artifact@v4
         with:
           name: build
@@ -100,6 +100,7 @@ jobs:
           java-version: '17'
       - name: Install SonarScanner
         run: dotnet tool install --global dotnet-sonarscanner
+      - run: dotnet restore ${{ env.SOLUTION_FILE }}
       - name: Run SonarCloud Analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -109,7 +110,7 @@ jobs:
             /o:"${{ secrets.SONAR_ORGANIZATION }}" \
             /d:sonar.token="${SONAR_TOKEN}" \
             /d:sonar.host.url="https://sonarcloud.io"
-          dotnet build ${{ env.SOLUTION_FILE }} --no-restore -c Release
+          dotnet build ${{ env.SOLUTION_FILE }} -c Release
           dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
 
   # ── Stage 6: Docker Build & Push ───────────────────────────

@@ -11,7 +11,7 @@ env:
   DOTNET_VERSION: '9.0'
   SOLUTION_FILE: 'CollectorShopPoc2.sln'
   PROJECT_NAME: 'collectorshop-back'
-  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/collectorshop-back
+  IMAGE_NAME: ghcr.io/maalsi-cube3/collectorshop-back
 
 jobs:
   # ── Stage 1: Lint ──────────────────────────────────────────

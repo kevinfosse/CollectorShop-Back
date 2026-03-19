@@ -190,25 +190,7 @@ jobs:
             test "$(docker inspect -f '{{.State.Running}}' collectorshop-back)" = "true"
             docker image prune -f
 
-  # ── Stage 9: Docker Build & Push to Nexus ─────────────────
-  docker-nexus:
-    runs-on: self-hosted
-    needs: [lint, build, test, security]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to Nexus Registry
-        run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login ${{ secrets.NEXUS_REGISTRY }} -u ${{ secrets.NEXUS_USER }} --password-stdin
-
-      - name: Build and push to Nexus
-        run: |
-          docker build -t ${{ secrets.NEXUS_REGISTRY }}/${{ env.PROJECT_NAME }}:${{ github.sha }} -t ${{ secrets.NEXUS_REGISTRY }}/${{ env.PROJECT_NAME }}:latest .
-          docker push ${{ secrets.NEXUS_REGISTRY }}/${{ env.PROJECT_NAME }}:${{ github.sha }}
-          docker push ${{ secrets.NEXUS_REGISTRY }}/${{ env.PROJECT_NAME }}:latest
-
-  # ── Stage 10: Deploy to K8s ───────────────────────────────
+  # ── Stage 9: Deploy to K8s ───────────────────────────────
   deploy-k8s:
     runs-on: self-hosted
     needs: [trivy]
@@ -225,20 +207,21 @@ jobs:
       - name: Configure kubeconfig
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > $HOME/.kube/config
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 --decode > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
+        shell: bash
 
-      - name: Create Nexus registry secret
+      - name: Create GHCR registry secret
         run: |
-          kubectl create secret docker-registry nexus-regcred \
-            --docker-server="${{ secrets.NEXUS_REGISTRY }}" \
-            --docker-username="${{ secrets.NEXUS_USER }}" \
-            --docker-password="${{ secrets.NEXUS_PASSWORD }}" \
+          kubectl create secret docker-registry ghcr-regcred \
+            --docker-server="ghcr.io" \
+            --docker-username="${{ github.actor }}" \
+            --docker-password="${{ secrets.GITHUB_TOKEN }}" \
             -n "${{ env.KUBE_NAMESPACE }}" --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to K8s
         run: |
-          IMAGE_FULL="${{ secrets.NEXUS_REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}"
+          IMAGE_FULL="${{ env.IMAGE_NAME }}:${{ github.sha }}"
           kubectl -n "${{ env.KUBE_NAMESPACE }}" set image deployment/"${{ env.APP_NAME }}" "${{ env.APP_NAME }}"="$IMAGE_FULL"
           kubectl -n "${{ env.KUBE_NAMESPACE }}" rollout status deployment/"${{ env.APP_NAME }}" --timeout=300s
 

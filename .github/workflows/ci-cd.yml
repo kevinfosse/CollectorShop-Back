@@ -200,15 +200,15 @@ jobs:
     env:
       KUBE_NAMESPACE: 'grpcube3'
       APP_NAME: 'collectorshop-back'
+      KUBECONFIG: /tmp/kubeconfig
     steps:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v3
 
       - name: Configure kubeconfig
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 --decode > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 --decode > $KUBECONFIG
+          chmod 600 $KUBECONFIG
         shell: bash
 
       - name: Create GHCR registry secret

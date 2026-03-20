@@ -190,10 +190,10 @@ jobs:
 
       - name: Create GHCR registry secret
         run: |
-          kubectl create secret docker-registry ghcr-regcred-back \
+          kubectl create secret docker-registry ghcr-regcred \
             --docker-server="ghcr.io" \
             --docker-username="${{ github.actor }}" \
-            --docker-password="${{ secrets.GITHUB_TOKEN }}" \
+            --docker-password="${{ secrets.GHCR_PAT }}" \
             -n "${{ env.KUBE_NAMESPACE }}" --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy to K8s

@@ -1,3 +1,8 @@
+using MailKit.Net.Smtp;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using MimeKit;
+
 namespace CollectorShop.Infrastructure.Services;
 
 public interface IEmailService
@@ -11,35 +16,95 @@ public interface IEmailService
 
 public class EmailService : IEmailService
 {
-    // TODO: Implement with actual email provider (SendGrid, SMTP, etc.)
+    private readonly string _host;
+    private readonly int _port;
+    private readonly bool _useSsl;
+    private readonly string _senderEmail;
+    private readonly string _senderName;
+    private readonly ILogger<EmailService> _logger;
 
-    public Task SendEmailAsync(string to, string subject, string body, CancellationToken cancellationToken = default)
+    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
     {
-        // Implementation placeholder
-        return Task.CompletedTask;
+        var smtpSettings = configuration.GetSection("SmtpSettings");
+        _host = smtpSettings["Host"] ?? "localhost";
+        _port = int.Parse(smtpSettings["Port"] ?? "25");
+        _useSsl = bool.Parse(smtpSettings["UseSsl"] ?? "false");
+        _senderEmail = smtpSettings["SenderEmail"] ?? "noreply@maalsikube.dev";
+        _senderName = smtpSettings["SenderName"] ?? "CollectorShop";
+        _logger = logger;
     }
 
-    public Task SendOrderConfirmationAsync(string to, string orderNumber, CancellationToken cancellationToken = default)
+    public async Task SendEmailAsync(string to, string subject, string body, CancellationToken cancellationToken = default)
     {
-        // Implementation placeholder
-        return Task.CompletedTask;
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(_senderName, _senderEmail));
+        message.To.Add(MailboxAddress.Parse(to));
+        message.Subject = subject;
+
+        message.Body = new TextPart("html") { Text = body };
+
+        using var client = new SmtpClient();
+        await client.ConnectAsync(_host, _port, _useSsl ? MailKit.Security.SecureSocketOptions.StartTls : MailKit.Security.SecureSocketOptions.None, cancellationToken);
+        await client.SendAsync(message, cancellationToken);
+        await client.DisconnectAsync(true, cancellationToken);
+
+        _logger.LogInformation("Email sent to {To} with subject '{Subject}'", to, subject);
     }
 
-    public Task SendOrderShippedAsync(string to, string orderNumber, string trackingNumber, CancellationToken cancellationToken = default)
+    public async Task SendOrderConfirmationAsync(string to, string orderNumber, CancellationToken cancellationToken = default)
     {
-        // Implementation placeholder
-        return Task.CompletedTask;
+        var subject = $"Order Confirmation - {orderNumber}";
+        var body = $"""
+            <h2>Thank you for your order!</h2>
+            <p>Your order <strong>{orderNumber}</strong> has been confirmed.</p>
+            <p>We will notify you when your order ships.</p>
+            <br/>
+            <p>— The CollectorShop Team</p>
+            """;
+
+        await SendEmailAsync(to, subject, body, cancellationToken);
     }
 
-    public Task SendPasswordResetAsync(string to, string resetLink, CancellationToken cancellationToken = default)
+    public async Task SendOrderShippedAsync(string to, string orderNumber, string trackingNumber, CancellationToken cancellationToken = default)
     {
-        // Implementation placeholder
-        return Task.CompletedTask;
+        var subject = $"Your Order {orderNumber} Has Shipped!";
+        var body = $"""
+            <h2>Your order is on its way!</h2>
+            <p>Order <strong>{orderNumber}</strong> has been shipped.</p>
+            <p>Tracking number: <strong>{trackingNumber}</strong></p>
+            <br/>
+            <p>— The CollectorShop Team</p>
+            """;
+
+        await SendEmailAsync(to, subject, body, cancellationToken);
     }
 
-    public Task SendWelcomeEmailAsync(string to, string firstName, CancellationToken cancellationToken = default)
+    public async Task SendPasswordResetAsync(string to, string resetLink, CancellationToken cancellationToken = default)
     {
-        // Implementation placeholder
-        return Task.CompletedTask;
+        var subject = "Reset Your Password - CollectorShop";
+        var body = $"""
+            <h2>Password Reset Request</h2>
+            <p>Click the link below to reset your password:</p>
+            <p><a href="{resetLink}">Reset Password</a></p>
+            <p>If you did not request this, please ignore this email.</p>
+            <br/>
+            <p>— The CollectorShop Team</p>
+            """;
+
+        await SendEmailAsync(to, subject, body, cancellationToken);
+    }
+
+    public async Task SendWelcomeEmailAsync(string to, string firstName, CancellationToken cancellationToken = default)
+    {
+        var subject = "Welcome to CollectorShop!";
+        var body = $"""
+            <h2>Welcome, {firstName}!</h2>
+            <p>Thank you for joining CollectorShop.</p>
+            <p>Start exploring our collection of unique collectible items.</p>
+            <br/>
+            <p>— The CollectorShop Team</p>
+            """;
+
+        await SendEmailAsync(to, subject, body, cancellationToken);
     }
 }

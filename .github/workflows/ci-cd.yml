@@ -198,7 +198,8 @@ jobs:
 
       - name: Deploy to K8s
         run: |
-          IMAGE_FULL="${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          IMAGE_FULL="${{ env.IMAGE_NAME }}:${SHORT_SHA}"
           kubectl -n "${{ env.KUBE_NAMESPACE }}" set image deployment/"${{ env.APP_NAME }}" "${{ env.APP_NAME }}"="$IMAGE_FULL"
           kubectl -n "${{ env.KUBE_NAMESPACE }}" rollout status deployment/"${{ env.APP_NAME }}" --timeout=300s
 

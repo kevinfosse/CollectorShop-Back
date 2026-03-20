@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CollectorShop.API.DTOs.Common;
 using CollectorShop.API.DTOs.Orders;
+using CollectorShop.API.Services;
 using CollectorShop.Domain.Entities;
 using CollectorShop.Domain.Enums;
 using CollectorShop.Domain.Interfaces;
@@ -17,13 +18,13 @@ public class OrdersController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<OrdersController> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly ShippingSettingsService _shippingSettings;
 
-    public OrdersController(IUnitOfWork unitOfWork, ILogger<OrdersController> logger, IConfiguration configuration)
+    public OrdersController(IUnitOfWork unitOfWork, ILogger<OrdersController> logger, ShippingSettingsService shippingSettings)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
-        _configuration = configuration;
+        _shippingSettings = shippingSettings;
     }
 
     [HttpGet]
@@ -127,8 +128,10 @@ public class OrdersController : ControllerBase
 
         var subtotal = cart.Items.Sum(i => i.UnitPrice.Amount * i.Quantity);
         var currency = cart.Items.First().UnitPrice.Currency;
-        var shippingCost = _configuration.GetValue<decimal>("OrderSettings:DefaultShippingCost", 25m);
-        var taxRate = _configuration.GetValue<decimal>("OrderSettings:TaxRate", 0.20m);
+        var settings = _shippingSettings.GetSettings();
+        var shippingCost = settings.FreeShippingThreshold > 0 && subtotal >= settings.FreeShippingThreshold
+            ? 0m : settings.DefaultShippingCost;
+        var taxRate = settings.TaxRate;
 
         decimal discountAmount = 0;
         string? couponMessage = null;
@@ -240,10 +243,12 @@ public class OrdersController : ControllerBase
             }
         }
 
-        // Set shipping and tax from configuration
-        var shippingCost = _configuration.GetValue<decimal>("OrderSettings:DefaultShippingCost", 25m);
-        var taxRate = _configuration.GetValue<decimal>("OrderSettings:TaxRate", 0.20m);
+        // Set shipping and tax from admin-configurable settings
+        var settings = _shippingSettings.GetSettings();
         var currency = order.SubTotal.Currency;
+        var shippingCost = settings.FreeShippingThreshold > 0 && order.SubTotal.Amount >= settings.FreeShippingThreshold
+            ? 0m : settings.DefaultShippingCost;
+        var taxRate = settings.TaxRate;
         order.SetShippingCost(new Money(shippingCost, currency));
         var taxableAmount = order.SubTotal.Subtract(order.DiscountAmount);
         order.SetTaxAmount(new Money(Math.Round(taxableAmount.Amount * taxRate, 2), currency));

@@ -155,6 +155,7 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<CollectorShop.Domain.Interfaces.ICurrentUserService, CurrentUserService>();
+        services.AddSingleton<ShippingSettingsService>();
 
         return services;
     }

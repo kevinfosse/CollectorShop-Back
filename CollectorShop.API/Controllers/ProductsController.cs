@@ -231,6 +231,22 @@ public class ProductsController : ControllerBase
             product.Deactivate();
         }
 
+        // Replace images
+        product.ClearImages();
+        foreach (var imageRequest in request.Images)
+        {
+            var image = new ProductImage(product.Id, imageRequest.Url, imageRequest.AltText, imageRequest.DisplayOrder, imageRequest.IsPrimary);
+            product.AddImage(image);
+        }
+
+        // Replace attributes
+        product.ClearAttributes();
+        foreach (var attrRequest in request.Attributes)
+        {
+            var attribute = new ProductAttribute(product.Id, attrRequest.Name, attrRequest.Value);
+            product.AddAttribute(attribute);
+        }
+
         _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
 

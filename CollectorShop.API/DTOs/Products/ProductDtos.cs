@@ -84,6 +84,8 @@ public class UpdateProductRequest
     public Guid? BrandId { get; set; }
     public bool IsFeatured { get; set; }
     public bool IsActive { get; set; }
+    public List<CreateProductImageRequest> Images { get; set; } = new();
+    public List<CreateProductAttributeRequest> Attributes { get; set; } = new();
 }
 
 public class ProductImageDto

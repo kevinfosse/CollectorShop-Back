@@ -19,9 +19,13 @@ public class ReviewConfiguration : IEntityTypeConfiguration<Review>
         builder.Property(r => r.Comment)
             .HasMaxLength(2000);
 
+        builder.Property(r => r.Status)
+            .HasConversion<int>()
+            .IsRequired();
+
         builder.HasIndex(r => r.ProductId);
         builder.HasIndex(r => r.CustomerId);
-        builder.HasIndex(r => r.IsApproved);
+        builder.HasIndex(r => r.Status);
         builder.HasIndex(r => new { r.CustomerId, r.ProductId })
             .IsUnique();
     }

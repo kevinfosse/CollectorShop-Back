@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using CollectorShop.API.DTOs.Reviews;
 using CollectorShop.Domain.Entities;
+using CollectorShop.Domain.Enums;
 using CollectorShop.Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -25,20 +26,7 @@ public class ReviewsController : ControllerBase
     {
         var reviews = await _unitOfWork.Reviews.GetApprovedReviewsAsync(productId);
 
-        var reviewDtos = reviews.Select(r => new ReviewDto
-        {
-            Id = r.Id,
-            ProductId = r.ProductId,
-            ProductName = r.Product?.Name ?? string.Empty,
-            CustomerId = r.CustomerId,
-            CustomerName = r.Customer?.FullName ?? "Anonymous",
-            Rating = r.Rating,
-            Title = r.Title,
-            Comment = r.Comment,
-            IsVerifiedPurchase = r.IsVerifiedPurchase,
-            IsApproved = r.IsApproved,
-            CreatedAt = r.CreatedAt
-        });
+        var reviewDtos = reviews.Select(MapToDto);
 
         return Ok(reviewDtos);
     }
@@ -47,9 +35,34 @@ public class ReviewsController : ControllerBase
     public async Task<ActionResult> GetProductReviewStats(Guid productId)
     {
         var averageRating = await _unitOfWork.Reviews.GetAverageRatingAsync(productId);
-        var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ProductId == productId && r.IsApproved);
+        var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ProductId == productId && r.Status == ReviewStatus.Approved);
 
         return Ok(new { AverageRating = averageRating, ReviewCount = reviewCount });
+    }
+
+    [Authorize]
+    [HttpGet("can-review/{productId:guid}")]
+    public async Task<ActionResult> CanReviewProduct(Guid productId)
+    {
+        var customerId = await GetCurrentCustomerIdAsync();
+        if (customerId == null)
+        {
+            return Ok(new { CanReview = false, Reason = "No customer profile" });
+        }
+
+        var hasReviewed = await _unitOfWork.Reviews.HasCustomerReviewedProductAsync(customerId.Value, productId);
+        if (hasReviewed)
+        {
+            return Ok(new { CanReview = false, Reason = "Already reviewed" });
+        }
+
+        var hasPurchased = await HasPurchasedProductAsync(customerId.Value, productId);
+        if (!hasPurchased)
+        {
+            return Ok(new { CanReview = false, Reason = "Not purchased" });
+        }
+
+        return Ok(new { CanReview = true, Reason = string.Empty });
     }
 
     [Authorize]
@@ -64,20 +77,7 @@ public class ReviewsController : ControllerBase
 
         var reviews = await _unitOfWork.Reviews.GetByCustomerIdAsync(customerId.Value);
 
-        var reviewDtos = reviews.Select(r => new ReviewDto
-        {
-            Id = r.Id,
-            ProductId = r.ProductId,
-            ProductName = r.Product?.Name ?? string.Empty,
-            CustomerId = r.CustomerId,
-            CustomerName = r.Customer?.FullName ?? "Anonymous",
-            Rating = r.Rating,
-            Title = r.Title,
-            Comment = r.Comment,
-            IsVerifiedPurchase = r.IsVerifiedPurchase,
-            IsApproved = r.IsApproved,
-            CreatedAt = r.CreatedAt
-        });
+        var reviewDtos = reviews.Select(MapToDto);
 
         return Ok(reviewDtos);
     }
@@ -104,6 +104,13 @@ public class ReviewsController : ControllerBase
             return BadRequest(new { Message = "You have already reviewed this product" });
         }
 
+        // Only customers who purchased the product can review it
+        var hasPurchased = await HasPurchasedProductAsync(customerId.Value, request.ProductId);
+        if (!hasPurchased)
+        {
+            return BadRequest(new { Message = "You must purchase this product before you can review it" });
+        }
+
         var review = new Review(
             request.ProductId,
             customerId.Value,
@@ -112,16 +119,7 @@ public class ReviewsController : ControllerBase
             request.Comment
         );
 
-        // Check if customer has purchased this product
-        var customerOrders = await _unitOfWork.Orders.GetByCustomerIdAsync(customerId.Value);
-        var hasPurchased = customerOrders.Any(o =>
-            o.Items.Any(i => i.ProductId == request.ProductId) &&
-            (o.Status == Domain.Enums.OrderStatus.Delivered || o.Status == Domain.Enums.OrderStatus.Shipped));
-
-        if (hasPurchased)
-        {
-            review.MarkAsVerifiedPurchase();
-        }
+        review.MarkAsVerifiedPurchase();
 
         await _unitOfWork.Reviews.AddAsync(review);
         await _unitOfWork.SaveChangesAsync();
@@ -141,7 +139,7 @@ public class ReviewsController : ControllerBase
             Title = review.Title,
             Comment = review.Comment,
             IsVerifiedPurchase = review.IsVerifiedPurchase,
-            IsApproved = review.IsApproved,
+            Status = review.Status.ToString(),
             CreatedAt = review.CreatedAt
         });
     }
@@ -174,18 +172,7 @@ public class ReviewsController : ControllerBase
 
         _logger.LogInformation("Review {ReviewId} updated", id);
 
-        return Ok(new ReviewDto
-        {
-            Id = review.Id,
-            ProductId = review.ProductId,
-            CustomerId = review.CustomerId,
-            Rating = review.Rating,
-            Title = review.Title,
-            Comment = review.Comment,
-            IsVerifiedPurchase = review.IsVerifiedPurchase,
-            IsApproved = review.IsApproved,
-            CreatedAt = review.CreatedAt
-        });
+        return Ok(MapToDto(review));
     }
 
     [Authorize]
@@ -219,20 +206,7 @@ public class ReviewsController : ControllerBase
     {
         var reviews = await _unitOfWork.Reviews.GetPendingReviewsAsync();
 
-        var reviewDtos = reviews.Select(r => new ReviewDto
-        {
-            Id = r.Id,
-            ProductId = r.ProductId,
-            ProductName = r.Product?.Name ?? string.Empty,
-            CustomerId = r.CustomerId,
-            CustomerName = r.Customer?.FullName ?? "Anonymous",
-            Rating = r.Rating,
-            Title = r.Title,
-            Comment = r.Comment,
-            IsVerifiedPurchase = r.IsVerifiedPurchase,
-            IsApproved = r.IsApproved,
-            CreatedAt = r.CreatedAt
-        });
+        var reviewDtos = reviews.Select(MapToDto);
 
         return Ok(reviewDtos);
     }
@@ -275,6 +249,32 @@ public class ReviewsController : ControllerBase
         _logger.LogInformation("Review {ReviewId} rejected", id);
 
         return Ok(new { Message = "Review rejected successfully" });
+    }
+
+    private async Task<bool> HasPurchasedProductAsync(Guid customerId, Guid productId)
+    {
+        var customerOrders = await _unitOfWork.Orders.GetByCustomerIdAsync(customerId);
+        return customerOrders.Any(o =>
+            o.Items.Any(i => i.ProductId == productId) &&
+            (o.Status == OrderStatus.Delivered || o.Status == OrderStatus.Shipped));
+    }
+
+    private static ReviewDto MapToDto(Review r)
+    {
+        return new ReviewDto
+        {
+            Id = r.Id,
+            ProductId = r.ProductId,
+            ProductName = r.Product?.Name ?? string.Empty,
+            CustomerId = r.CustomerId,
+            CustomerName = r.Customer?.FullName ?? "Anonymous",
+            Rating = r.Rating,
+            Title = r.Title,
+            Comment = r.Comment,
+            IsVerifiedPurchase = r.IsVerifiedPurchase,
+            Status = r.Status.ToString(),
+            CreatedAt = r.CreatedAt
+        };
     }
 
     private async Task<Guid?> GetCurrentCustomerIdAsync()

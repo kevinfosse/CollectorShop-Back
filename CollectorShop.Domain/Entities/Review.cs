@@ -1,4 +1,5 @@
 using CollectorShop.Domain.Common;
+using CollectorShop.Domain.Enums;
 
 namespace CollectorShop.Domain.Entities;
 
@@ -8,7 +9,7 @@ public class Review : BaseEntity
     public string? Title { get; private set; }
     public string? Comment { get; private set; }
     public bool IsVerifiedPurchase { get; private set; }
-    public bool IsApproved { get; private set; }
+    public ReviewStatus Status { get; private set; }
 
     public Guid ProductId { get; private set; }
     public Product Product { get; private set; } = null!;
@@ -29,7 +30,7 @@ public class Review : BaseEntity
         Title = title;
         Comment = comment;
         IsVerifiedPurchase = false;
-        IsApproved = false;
+        Status = ReviewStatus.Pending;
     }
 
     public void UpdateReview(int rating, string? title, string? comment)
@@ -44,6 +45,6 @@ public class Review : BaseEntity
     }
 
     public void MarkAsVerifiedPurchase() => IsVerifiedPurchase = true;
-    public void Approve() => IsApproved = true;
-    public void Reject() => IsApproved = false;
+    public void Approve() => Status = ReviewStatus.Approved;
+    public void Reject() => Status = ReviewStatus.Rejected;
 }

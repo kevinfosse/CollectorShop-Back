@@ -74,7 +74,7 @@ public class ProductsController : ControllerBase
         }
 
         var averageRating = await _unitOfWork.Reviews.GetAverageRatingAsync(id);
-        var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ProductId == id && r.IsApproved);
+        var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ProductId == id && r.Status == Domain.Enums.ReviewStatus.Approved);
 
         var dto = MapToProductDto(product, averageRating, reviewCount);
         return Ok(dto);
@@ -91,7 +91,7 @@ public class ProductsController : ControllerBase
 
         var fullProduct = await _unitOfWork.Products.GetByIdWithDetailsAsync(product.Id);
         var averageRating = await _unitOfWork.Reviews.GetAverageRatingAsync(product.Id);
-        var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ProductId == product.Id && r.IsApproved);
+        var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ProductId == product.Id && r.Status == Domain.Enums.ReviewStatus.Approved);
 
         var dto = MapToProductDto(fullProduct!, averageRating, reviewCount);
         return Ok(dto);
@@ -254,7 +254,7 @@ public class ProductsController : ControllerBase
 
         var updatedProduct = await _unitOfWork.Products.GetByIdWithDetailsAsync(id);
         var averageRating = await _unitOfWork.Reviews.GetAverageRatingAsync(id);
-        var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ProductId == id && r.IsApproved);
+        var reviewCount = await _unitOfWork.Reviews.CountAsync(r => r.ProductId == id && r.Status == Domain.Enums.ReviewStatus.Approved);
 
         return Ok(MapToProductDto(updatedProduct!, averageRating, reviewCount));
     }

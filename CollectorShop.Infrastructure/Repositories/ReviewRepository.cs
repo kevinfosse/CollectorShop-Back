@@ -1,4 +1,5 @@
 using CollectorShop.Domain.Entities;
+using CollectorShop.Domain.Enums;
 using CollectorShop.Domain.Interfaces;
 using CollectorShop.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -32,7 +33,7 @@ public class ReviewRepository : Repository<Review>, IReviewRepository
     public async Task<IReadOnlyList<Review>> GetApprovedReviewsAsync(Guid productId, CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(r => r.ProductId == productId && r.IsApproved)
+            .Where(r => r.ProductId == productId && r.Status == ReviewStatus.Approved)
             .Include(r => r.Customer)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -41,7 +42,7 @@ public class ReviewRepository : Repository<Review>, IReviewRepository
     public async Task<IReadOnlyList<Review>> GetPendingReviewsAsync(CancellationToken cancellationToken = default)
     {
         return await _dbSet
-            .Where(r => !r.IsApproved)
+            .Where(r => r.Status == ReviewStatus.Pending)
             .Include(r => r.Customer)
             .Include(r => r.Product)
             .OrderBy(r => r.CreatedAt)
@@ -51,7 +52,7 @@ public class ReviewRepository : Repository<Review>, IReviewRepository
     public async Task<double> GetAverageRatingAsync(Guid productId, CancellationToken cancellationToken = default)
     {
         var reviews = await _dbSet
-            .Where(r => r.ProductId == productId && r.IsApproved)
+            .Where(r => r.ProductId == productId && r.Status == ReviewStatus.Approved)
             .ToListAsync(cancellationToken);
 
         return reviews.Any() ? reviews.Average(r => r.Rating) : 0;

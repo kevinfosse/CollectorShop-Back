@@ -146,6 +146,21 @@ public class Product : BaseEntity
         _attributes.Add(attribute);
     }
 
+    public void RemoveAttribute(ProductAttribute attribute)
+    {
+        _attributes.Remove(attribute);
+    }
+
+    public void ClearImages()
+    {
+        _images.Clear();
+    }
+
+    public void ClearAttributes()
+    {
+        _attributes.Clear();
+    }
+
     public void SetCategory(Guid categoryId)
     {
         CategoryId = categoryId;

@@ -65,16 +65,18 @@ public class CartController : ControllerBase
             return BadRequest(new { Message = "Product is not available" });
         }
 
-        if (product.AvailableQuantity < request.Quantity)
-        {
-            return BadRequest(new { Message = "Insufficient stock available" });
-        }
-
         var cart = await _unitOfWork.Carts.GetByCustomerIdWithItemsAsync(customerId.Value);
         if (cart == null)
         {
             cart = new Cart(customerId.Value);
             await _unitOfWork.Carts.AddAsync(cart);
+        }
+
+        var existingQuantity = cart.Items.FirstOrDefault(i => i.ProductId == request.ProductId)?.Quantity ?? 0;
+        var totalQuantity = existingQuantity + request.Quantity;
+        if (product.AvailableQuantity < totalQuantity)
+        {
+            return BadRequest(new { Message = $"Insufficient stock. Available: {product.AvailableQuantity}, in cart: {existingQuantity}, requested: {request.Quantity}" });
         }
 
         cart.AddItem(product, request.Quantity);

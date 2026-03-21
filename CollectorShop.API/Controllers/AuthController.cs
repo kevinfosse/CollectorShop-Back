@@ -4,6 +4,7 @@ using CollectorShop.Domain.Entities;
 using CollectorShop.Domain.Interfaces;
 using CollectorShop.Domain.ValueObjects;
 using CollectorShop.Infrastructure.Data;
+using CollectorShop.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -22,6 +23,7 @@ public class AuthController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _configuration;
+    private readonly IEmailService _emailService;
 
     public AuthController(
         UserManager<ApplicationUser> userManager,
@@ -29,7 +31,8 @@ public class AuthController : ControllerBase
         ITokenService tokenService,
         IUnitOfWork unitOfWork,
         ILogger<AuthController> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IEmailService emailService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -37,6 +40,7 @@ public class AuthController : ControllerBase
         _unitOfWork = unitOfWork;
         _logger = logger;
         _configuration = configuration;
+        _emailService = emailService;
     }
 
     [HttpGet("password-policy")]
@@ -100,6 +104,8 @@ public class AuthController : ControllerBase
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("User {Email} registered successfully", request.Email);
+
+        _ = _emailService.SendWelcomeEmailAsync(request.Email, request.FirstName, cancellationToken);
 
         return Ok(new AuthResponse
         {
@@ -313,7 +319,14 @@ public class AuthController : ControllerBase
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
-        // TODO: Send email with reset link
+        var encodedToken = Uri.EscapeDataString(token);
+        var encodedEmail = Uri.EscapeDataString(request.Email);
+        var frontendUrl = _configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()?.FirstOrDefault() ?? "https://maalsikube.dev";
+        var resetLink = $"{frontendUrl}/auth/reset-password?token={encodedToken}&email={encodedEmail}";
+
+        var firstName = user.FirstName ?? "there";
+        _ = _emailService.SendPasswordResetAsync(request.Email, firstName, resetLink);
+
         _logger.LogInformation("Password reset requested for {Email}", request.Email);
 
         return Ok(new { Message = "If the email exists, a password reset link has been sent" });

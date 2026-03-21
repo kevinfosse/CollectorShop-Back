@@ -6,6 +6,7 @@ using CollectorShop.Domain.Entities;
 using CollectorShop.Domain.Enums;
 using CollectorShop.Domain.Interfaces;
 using CollectorShop.Domain.ValueObjects;
+using CollectorShop.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,12 +20,14 @@ public class OrdersController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<OrdersController> _logger;
     private readonly ShippingSettingsService _shippingSettings;
+    private readonly IEmailService _emailService;
 
-    public OrdersController(IUnitOfWork unitOfWork, ILogger<OrdersController> logger, ShippingSettingsService shippingSettings)
+    public OrdersController(IUnitOfWork unitOfWork, ILogger<OrdersController> logger, ShippingSettingsService shippingSettings, IEmailService emailService)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
         _shippingSettings = shippingSettings;
+        _emailService = emailService;
     }
 
     [HttpGet]
@@ -266,6 +269,23 @@ public class OrdersController : ControllerBase
         _logger.LogInformation("Order {OrderNumber} created for customer {CustomerId}", order.OrderNumber, customerId);
 
         var createdOrder = await _unitOfWork.Orders.GetByIdWithDetailsAsync(order.Id);
+
+        // Send order confirmation email
+        var customer = await _unitOfWork.Customers.GetByIdAsync(customerId.Value);
+        if (customer?.Email != null)
+        {
+            var emailItems = createdOrder!.Items.Select(i => new OrderItemEmail
+            {
+                ProductName = i.ProductName,
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice.Amount,
+                TotalPrice = i.TotalPrice.Amount
+            });
+            _ = _emailService.SendOrderConfirmationAsync(
+                customer.Email.Value, customer.FirstName, order.OrderNumber,
+                order.TotalAmount.Amount, order.TotalAmount.Currency, emailItems);
+        }
+
         return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, MapToOrderDto(createdOrder!));
     }
 
@@ -318,6 +338,23 @@ public class OrdersController : ControllerBase
 
         _logger.LogInformation("Order {OrderNumber} status updated to {Status}", order.OrderNumber, request.Status);
 
+        // Send status change email
+        var statusCustomer = await _unitOfWork.Customers.GetByIdAsync(order.CustomerId);
+        if (statusCustomer?.Email != null)
+        {
+            var email = statusCustomer.Email.Value;
+            var name = statusCustomer.FirstName;
+            var orderNum = order.OrderNumber;
+            _ = request.Status switch
+            {
+                OrderStatus.Confirmed => _emailService.SendOrderConfirmedAsync(email, name, orderNum),
+                OrderStatus.Processing => _emailService.SendOrderProcessingAsync(email, name, orderNum),
+                OrderStatus.Delivered => _emailService.SendOrderDeliveredAsync(email, name, orderNum),
+                OrderStatus.Cancelled => _emailService.SendOrderCancelledAsync(email, name, orderNum, request.Notes),
+                _ => Task.CompletedTask
+            };
+        }
+
         var updatedOrder = await _unitOfWork.Orders.GetByIdWithDetailsAsync(id);
         return Ok(MapToOrderDto(updatedOrder!));
     }
@@ -343,6 +380,15 @@ public class OrdersController : ControllerBase
 
         _logger.LogInformation("Order {OrderNumber} shipped with tracking {TrackingNumber}",
             order.OrderNumber, request.TrackingNumber);
+
+        // Send shipped email
+        var shipCustomer = await _unitOfWork.Customers.GetByIdAsync(order.CustomerId);
+        if (shipCustomer?.Email != null)
+        {
+            _ = _emailService.SendOrderShippedAsync(
+                shipCustomer.Email.Value, shipCustomer.FirstName,
+                order.OrderNumber, request.TrackingNumber, request.Carrier);
+        }
 
         var updatedOrder = await _unitOfWork.Orders.GetByIdWithDetailsAsync(id);
         return Ok(MapToOrderDto(updatedOrder!));
@@ -379,6 +425,15 @@ public class OrdersController : ControllerBase
         await _unitOfWork.SaveChangesAsync();
 
         _logger.LogInformation("Order {OrderNumber} cancelled", order.OrderNumber);
+
+        // Send cancellation email
+        var cancelCustomer = await _unitOfWork.Customers.GetByIdAsync(order.CustomerId);
+        if (cancelCustomer?.Email != null)
+        {
+            _ = _emailService.SendOrderCancelledAsync(
+                cancelCustomer.Email.Value, cancelCustomer.FirstName,
+                order.OrderNumber, reason);
+        }
 
         var updatedOrder = await _unitOfWork.Orders.GetByIdWithDetailsAsync(id);
         return Ok(MapToOrderDto(updatedOrder!));

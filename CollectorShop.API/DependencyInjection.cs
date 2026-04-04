@@ -4,6 +4,7 @@ using CollectorShop.API.Authentication;
 using CollectorShop.API.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -148,6 +149,20 @@ public static class DependencyInjection
                     },
                     Array.Empty<string>()
                 }
+            });
+        });
+
+        // MassTransit + RabbitMQ
+        services.AddMassTransit(x =>
+        {
+            x.UsingRabbitMq((context, cfg) =>
+            {
+                cfg.Host(configuration["RabbitMQ:Host"] ?? "localhost", "/", h =>
+                {
+                    h.Username(configuration["RabbitMQ:Username"] ?? "guest");
+                    h.Password(configuration["RabbitMQ:Password"] ?? "guest");
+                });
+                cfg.ConfigureEndpoints(context);
             });
         });
 

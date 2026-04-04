@@ -1,8 +1,10 @@
 using CollectorShop.API.DTOs.Common;
 using CollectorShop.API.DTOs.Products;
 using CollectorShop.Domain.Entities;
+using CollectorShop.Domain.Events;
 using CollectorShop.Domain.Interfaces;
 using CollectorShop.Domain.ValueObjects;
+using MassTransit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,11 +16,13 @@ public class ProductsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ProductsController> _logger;
+    private readonly IPublishEndpoint _publishEndpoint;
 
-    public ProductsController(IUnitOfWork unitOfWork, ILogger<ProductsController> logger)
+    public ProductsController(IUnitOfWork unitOfWork, ILogger<ProductsController> logger, IPublishEndpoint publishEndpoint)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _publishEndpoint = publishEndpoint;
     }
 
     [HttpGet]
@@ -192,6 +196,8 @@ public class ProductsController : ControllerBase
         await _unitOfWork.Products.AddAsync(product);
         await _unitOfWork.SaveChangesAsync();
 
+        await _publishEndpoint.Publish(new ProductCreatedEvent(product.Id, product.Name, product.Sku));
+
         _logger.LogInformation("Product {ProductName} created with ID {ProductId}", product.Name, product.Id);
 
         var createdProduct = await _unitOfWork.Products.GetByIdWithDetailsAsync(product.Id);
@@ -207,6 +213,9 @@ public class ProductsController : ControllerBase
         {
             return NotFound();
         }
+
+        var oldPrice = product.Price.Amount;
+        var oldIsActive = product.IsActive;
 
         product.UpdateDetails(request.Name, request.Description, new Money(request.Price, request.Currency));
         product.SetCategory(request.CategoryId);
@@ -249,6 +258,16 @@ public class ProductsController : ControllerBase
 
         _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
+
+        if (product.Price.Amount != oldPrice)
+        {
+            await _publishEndpoint.Publish(new ProductPriceChangedEvent(product.Id, product.Name, oldPrice, product.Price.Amount, product.Price.Currency));
+        }
+
+        if (product.IsActive != oldIsActive)
+        {
+            await _publishEndpoint.Publish(new ProductStatusChangedEvent(product.Id, product.Name, product.IsActive));
+        }
 
         _logger.LogInformation("Product {ProductId} updated", id);
 

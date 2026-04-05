@@ -31,12 +31,19 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-// Apply migrations
+// Apply migrations (skip for non-relational providers, e.g. InMemory in tests)
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await dbContext.Database.MigrateAsync();
-    Log.Information("Database migrations applied successfully");
+    if (dbContext.Database.IsRelational())
+    {
+        await dbContext.Database.MigrateAsync();
+        Log.Information("Database migrations applied successfully");
+    }
+    else
+    {
+        await dbContext.Database.EnsureCreatedAsync();
+    }
 }
 
 // Seed roles
@@ -146,3 +153,5 @@ app.MapControllers().RequireRateLimiting("fixed");
 app.MapHealthChecks("/health");
 
 app.Run();
+
+public partial class Program { }

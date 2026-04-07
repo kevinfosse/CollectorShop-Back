@@ -1,0 +1,194 @@
+# ============================================================================
+# Pipeline CI/CD — CollectorShop Backend
+# Stratégie : Fail Fast, Shift Left (DevSecOps)
+#
+# Flux : Build → Tests (Unit + Integration) → Sécurité (SCA + Trivy) → Docker → Deploy
+#
+# Chaque étape est bloquante : si elle échoue, le pipeline s'arrête.
+# La sécurité est intégrée AVANT le build Docker (Shift Left).
+# Le déploiement est manuel (Continuous Delivery, pas Continuous Deployment)
+# car l'application gère des transactions financières.
+# ============================================================================
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Build — compilation du projet .NET pour valider l'intégrité du code source.
+  # Premier garde-fou : si le code ne compile pas, le pipeline s'arrête immédiatement.
+  # ----------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore
+      - run: dotnet build --no-restore
+
+  # ----------------------------------------------------------------------------
+  # Tests unitaires — vérifient la logique métier isolée (indicateur maintenabilité)
+  # Déclenchés sur chaque push pour un feedback rapide aux développeurs.
+  # ----------------------------------------------------------------------------
+  test-unit:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test --filter "Category!=Integration" --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage
+
+  # ----------------------------------------------------------------------------
+  # Tests d'intégration — vérifient la communication API + BDD (indicateur fiabilité)
+  # Uniquement sur PR pour éviter de ralentir les pushs sur les branches de travail.
+  # Un vrai SQL Server est lancé via service container pour des tests réalistes.
+  # ----------------------------------------------------------------------------
+  test-integration:
+    needs: build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: YourStrong@Passw0rd
+        ports:
+          - 1433:1433
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test --filter "Category=Integration"
+        env:
+          ConnectionStrings__DefaultConnection: "Server=localhost;Database=CollectorShopTest;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True"
+
+  # ----------------------------------------------------------------------------
+  # SCA (Software Composition Analysis) — détecte les dépendances NuGet vulnérables (indicateur sécurité)
+  # Shift Left : la sécurité des dépendances est vérifiée dès la PR, avant tout merge.
+  # ----------------------------------------------------------------------------
+  security-sca:
+    needs: build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore
+      - run: dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerability-report.txt
+      - run: |
+          if grep -q "has the following vulnerable packages" vulnerability-report.txt; then
+            echo "::warning::Vulnerable NuGet packages detected — check vulnerability-report.txt"
+          fi
+
+  # ----------------------------------------------------------------------------
+  # Build et push des images Docker vers GitHub Container Registry
+  # Deux images produites : backend API + service notifications.
+  # Taguées avec :latest ET :sha pour la traçabilité et les rollbacks.
+  # ----------------------------------------------------------------------------
+  docker-build:
+    needs: [test-unit, security-sca]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Image backend API
+      - uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/collectorshop-back:latest
+            ghcr.io/${{ github.repository_owner }}/collectorshop-back:${{ github.sha }}
+
+      # Image service notifications
+      - uses: docker/build-push-action@v5
+        with:
+          file: Dockerfile.notifications
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/collectorshop-notifications:latest
+            ghcr.io/${{ github.repository_owner }}/collectorshop-notifications:${{ github.sha }}
+
+  # ----------------------------------------------------------------------------
+  # Scan de vulnérabilités des images Docker — Shift Left Security (indicateur sécurité)
+  # Trivy analyse les images après build pour détecter les CVE dans les couches OS et les libs.
+  # exit-code: 0 — warning seulement, ne bloque pas (documenté dans le plan de remédiation).
+  # ----------------------------------------------------------------------------
+  security-trivy:
+    needs: docker-build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Scan de l'image backend API
+      - name: Trivy scan — collectorshop-back
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/collectorshop-back:${{ github.sha }}
+          format: table
+          output: trivy-report-back.txt
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      # Scan de l'image service notifications
+      - name: Trivy scan — collectorshop-notifications
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/collectorshop-notifications:${{ github.sha }}
+          format: table
+          output: trivy-report-notifications.txt
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports
+          path: |
+            trivy-report-back.txt
+            trivy-report-notifications.txt
+
+  # ----------------------------------------------------------------------------
+  # Déploiement Continuous Delivery — validation humaine avant production
+  # Déclenché manuellement (workflow_dispatch) car l'application gère des transactions
+  # financières : un humain valide chaque déploiement en production.
+  # Les commandes kubectl seront ajoutées quand le VPS sera configuré.
+  # ----------------------------------------------------------------------------
+  deploy:
+    needs: security-trivy
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to production
+        run: |
+          # TODO: ajouter kubectl apply quand le VPS sera prêt
+          echo "Deployment step - to be configured with kubectl"

@@ -156,7 +156,8 @@ jobs:
             /d:sonar.cs.opencover.reportsPaths="${{ steps.coverage.outputs.path }}" \
             /d:sonar.exclusions="**/Migrations/**,**/obj/**,**/bin/**"
 
-          dotnet build --no-restore
+          dotnet restore
+          dotnet build --no-incremental
 
           dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 

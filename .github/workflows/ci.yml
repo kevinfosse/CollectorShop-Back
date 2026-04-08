@@ -1,8 +1,9 @@
 # ============================================================================
-# Pipeline CI/CD — CollectorShop Backend
+# Pipeline CI/CD — CollectorShop Backend (ASP.NET Core 10.0)
 # Stratégie : Fail Fast, Shift Left (DevSecOps)
 #
-# Flux : Build → Tests (Unit + Integration) → Sécurité (SCA + Trivy) → Docker → Deploy
+# Flux : Build → Tests (Unit + Integration + Couverture) → Sécurité (SCA + SAST/SonarCloud)
+#        → Docker → Trivy (Scan images) → Deploy (manuel)
 #
 # Chaque étape est bloquante : si elle échoue, le pipeline s'arrête.
 # La sécurité est intégrée AVANT le build Docker (Shift Left).
@@ -10,11 +11,11 @@
 # car l'application gère des transactions financières.
 # ============================================================================
 
-name: CI/CD Pipeline
+name: CI/CD Backend
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -41,6 +42,8 @@ jobs:
   # ----------------------------------------------------------------------------
   # Tests unitaires — vérifient la logique métier isolée (indicateur maintenabilité)
   # Déclenchés sur chaque push pour un feedback rapide aux développeurs.
+  # La couverture de code est collectée par Coverlet et archivée comme artefact.
+  # Le rapport Cobertura sera envoyé à SonarCloud pour le Quality Gate.
   # ----------------------------------------------------------------------------
   test-unit:
     needs: build
@@ -50,7 +53,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet test --filter "Category!=Integration" --collect:"XPlat Code Coverage" --results-directory ./coverage
+      - run: dotnet test --filter "Category!=Integration" --collect:"XPlat Code Coverage" --results-directory ./coverage -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -58,7 +61,7 @@ jobs:
 
   # ----------------------------------------------------------------------------
   # Tests d'intégration — vérifient la communication API + BDD (indicateur fiabilité)
-  # Uniquement sur PR pour éviter de ralentir les pushs sur les branches de travail.
+  # Uniquement sur PR et main pour éviter de ralentir les branches de travail.
   # Un vrai SQL Server est lancé via service container pour des tests réalistes.
   # ----------------------------------------------------------------------------
   test-integration:
@@ -83,8 +86,8 @@ jobs:
           ConnectionStrings__DefaultConnection: "Server=localhost;Database=CollectorShopTest;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True"
 
   # ----------------------------------------------------------------------------
-  # SCA (Software Composition Analysis) — détecte les dépendances NuGet vulnérables (indicateur sécurité)
-  # Shift Left : la sécurité des dépendances est vérifiée dès la PR, avant tout merge.
+  # SCA (Software Composition Analysis) — détecte les dépendances NuGet vulnérables
+  # (indicateur sécurité). Shift Left : vérifié avant tout merge.
   # ----------------------------------------------------------------------------
   security-sca:
     needs: build
@@ -101,6 +104,61 @@ jobs:
           if grep -q "has the following vulnerable packages" vulnerability-report.txt; then
             echo "::warning::Vulnerable NuGet packages detected — check vulnerability-report.txt"
           fi
+
+  # ----------------------------------------------------------------------------
+  # SonarCloud — SAST (Static Application Security Testing) + Quality Gate
+  # (indicateurs maintenabilité + sécurité)
+  # Analyse le code source pour détecter : bugs, vulnérabilités, code smells,
+  # duplication et complexité cyclomatique. Reçoit le rapport de couverture
+  # Coverlet pour calculer le % de couverture (objectif ≥ 70%).
+  # Le Quality Gate valide que les seuils sont respectés.
+  # ----------------------------------------------------------------------------
+  sonarcloud:
+    needs: test-unit
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # SonarCloud a besoin de l'historique complet
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Récupérer le rapport de couverture du job test-unit
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage
+
+      # Trouver le fichier de couverture (Coverlet génère un GUID dans le chemin)
+      - name: Localiser le rapport de couverture
+        id: coverage
+        run: |
+          COVERAGE_FILE=$(find ./coverage -name "coverage.opencover.xml" | head -1)
+          echo "path=$COVERAGE_FILE" >> $GITHUB_OUTPUT
+          echo "Rapport de couverture trouvé : $COVERAGE_FILE"
+
+      # Installer et exécuter le scanner SonarCloud pour .NET
+      - name: Installer SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Analyse SonarCloud
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          dotnet sonarscanner begin \
+            /k:"kevinfosse_CollectorShop-Back" \
+            /o:"kevinfosse" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.cs.opencover.reportsPaths="${{ steps.coverage.outputs.path }}" \
+            /d:sonar.exclusions="**/Migrations/**,**/obj/**,**/bin/**"
+
+          dotnet build --no-restore
+
+          dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
   # ----------------------------------------------------------------------------
   # Build et push des images Docker vers GitHub Container Registry
@@ -122,6 +180,7 @@ jobs:
       # Image backend API
       - uses: docker/build-push-action@v5
         with:
+          context: .
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/collectorshop-back:latest
@@ -130,6 +189,7 @@ jobs:
       # Image service notifications
       - uses: docker/build-push-action@v5
         with:
+          context: .
           file: Dockerfile.notifications
           push: true
           tags: |
@@ -138,8 +198,9 @@ jobs:
 
   # ----------------------------------------------------------------------------
   # Scan de vulnérabilités des images Docker — Shift Left Security (indicateur sécurité)
-  # Trivy analyse les images après build pour détecter les CVE dans les couches OS et les libs.
-  # exit-code: 0 — warning seulement, ne bloque pas (documenté dans le plan de remédiation).
+  # Trivy analyse les images après build pour détecter les CVE dans les couches OS.
+  # exit-code: 0 — warning seulement, documenté dans le plan de remédiation.
+  # Les rapports sont archivés comme artefacts pour audit.
   # ----------------------------------------------------------------------------
   security-trivy:
     needs: docker-build
@@ -148,7 +209,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Scan de l'image backend API
       - name: Trivy scan — collectorshop-back
         uses: aquasecurity/trivy-action@master
         with:
@@ -158,7 +218,6 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: '0'
 
-      # Scan de l'image service notifications
       - name: Trivy scan — collectorshop-notifications
         uses: aquasecurity/trivy-action@master
         with:
@@ -179,16 +238,33 @@ jobs:
   # Déploiement Continuous Delivery — validation humaine avant production
   # Déclenché manuellement (workflow_dispatch) car l'application gère des transactions
   # financières : un humain valide chaque déploiement en production.
-  # Les commandes kubectl seront ajoutées quand le VPS sera configuré.
   # ----------------------------------------------------------------------------
   deploy:
     needs: security-trivy
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
+    env:
+      KUBECONFIG: /tmp/kubeconfig
     steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to production
+      - uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
         run: |
-          # TODO: ajouter kubectl apply quand le VPS sera prêt
-          echo "Deployment step - to be configured with kubectl"
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 --decode > $KUBECONFIG
+          chmod 600 $KUBECONFIG
+
+      - name: Deploy backend
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          kubectl -n collectorshop set image deployment/collectorshop-back collectorshop-back="ghcr.io/${{ github.repository_owner }}/collectorshop-back:${SHORT_SHA}"
+          kubectl -n collectorshop rollout status deployment/collectorshop-back --timeout=300s
+
+      - name: Deploy notifications
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          kubectl -n collectorshop set image deployment/collectorshop-notifications collectorshop-notifications="ghcr.io/${{ github.repository_owner }}/collectorshop-notifications:${SHORT_SHA}"
+          kubectl -n collectorshop rollout status deployment/collectorshop-notifications --timeout=300s
+
+      - name: Verify deployment
+        run: kubectl -n collectorshop get deployment,pods,svc

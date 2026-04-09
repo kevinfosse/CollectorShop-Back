@@ -321,7 +321,7 @@ public class AuthController : ControllerBase
 
         var encodedToken = Uri.EscapeDataString(token);
         var encodedEmail = Uri.EscapeDataString(request.Email);
-        var frontendUrl = _configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()?.FirstOrDefault() ?? "https://maalsikube.dev";
+        var frontendUrl = _configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()?.FirstOrDefault() ?? "https://collectorcube.duckdns.org/";
         var resetLink = $"{frontendUrl}/auth/reset-password?token={encodedToken}&email={encodedEmail}";
 
         var firstName = user.FirstName ?? "there";

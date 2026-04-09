@@ -80,7 +80,7 @@ public class EmailService : IEmailService
                 Start browsing and find your next treasure!
             </p>
             <div style="text-align: center; margin: 32px 0;">
-                <a href="https://maalsikube.dev" style="background-color: #1a1a2e; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                <a href="https://collectorcube.duckdns.org/" style="background-color: #1a1a2e; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
                     Browse Collection
                 </a>
             </div>
@@ -289,7 +289,7 @@ public class EmailService : IEmailService
                         <td style="background: #f8f9fa; padding: 20px 32px; text-align: center; border-top: 1px solid #eee;">
                             <p style="margin: 0; color: #999; font-size: 12px;">
                                 &copy; {DateTime.UtcNow.Year} CollectorShop. All rights reserved.<br/>
-                                <a href="https://maalsikube.dev" style="color: #1a1a2e;">maalsikube.dev</a>
+                                <a href="https://collectorcube.duckdns.org/" style="color: #1a1a2e;">maalsikube.dev</a>
                             </p>
                         </td>
                     </tr>

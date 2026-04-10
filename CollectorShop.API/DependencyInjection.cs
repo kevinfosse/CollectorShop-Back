@@ -1,6 +1,10 @@
 using System.Net;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using CollectorShop.API.Authentication;
+using CollectorShop.Domain.Entities;
+using CollectorShop.Domain.Interfaces;
+using CollectorShop.Domain.ValueObjects;
 using CollectorShop.API.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -132,11 +136,57 @@ public static class DependencyInjection
                         Log.Error("JWT authentication failed: {ErrorMessage}", context.Exception.Message);
                         return Task.CompletedTask;
                     },
-                    OnTokenValidated = context =>
+                    OnTokenValidated = async context =>
                     {
-                        var userName = context.Principal?.Identity?.Name ?? "unknown";
+                        var principal = context.Principal;
+                        if (principal == null)
+                        {
+                            return;
+                        }
+
+                        var userId = principal.FindFirstValue("sub")
+                                     ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
+                        var email = principal.FindFirstValue("email")
+                                    ?? principal.FindFirstValue(ClaimTypes.Email);
+                        var firstName = principal.FindFirstValue("given_name")
+                                        ?? principal.FindFirstValue(ClaimTypes.GivenName)
+                                        ?? "Utilisateur";
+                        var lastName = principal.FindFirstValue("family_name")
+                                       ?? principal.FindFirstValue(ClaimTypes.Surname)
+                                       ?? "CollectorShop";
+
+                        var userName = principal.Identity?.Name ?? email ?? userId ?? "unknown";
                         Log.Information("JWT token validated successfully for user {UserName}", userName);
-                        return Task.CompletedTask;
+
+                        // Skip profile sync when required identity attributes are missing.
+                        if (string.IsNullOrWhiteSpace(email))
+                        {
+                            Log.Warning("JWT token validated without email claim, skipping local profile sync");
+                            return;
+                        }
+
+                        var cancellationToken = context.HttpContext.RequestAborted;
+                        using var scope = context.HttpContext.RequestServices.CreateScope();
+                        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+                        Customer? existingCustomer = null;
+                        if (!string.IsNullOrWhiteSpace(userId))
+                        {
+                            existingCustomer = await unitOfWork.Customers.GetByUserIdAsync(userId, cancellationToken);
+                        }
+
+                        existingCustomer ??= await unitOfWork.Customers.GetByEmailAsync(email, cancellationToken);
+
+                        if (existingCustomer != null)
+                        {
+                            return;
+                        }
+
+                        var customer = new Customer(firstName, lastName, new Email(email), userId);
+                        await unitOfWork.Customers.AddAsync(customer, cancellationToken);
+                        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+                        Log.Information("Profil local créé pour l'utilisateur {Email}", email);
                     }
                 };
             });

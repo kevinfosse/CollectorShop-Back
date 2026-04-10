@@ -1,4 +1,3 @@
-using System.Text;
 using System.Threading.RateLimiting;
 using CollectorShop.API.Authentication;
 using CollectorShop.API.Services;
@@ -85,9 +84,11 @@ public static class DependencyInjection
         }
         else
         {
-            // JWT Authentication
-            var jwtSettings = configuration.GetSection("JwtSettings");
-            var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured. Please set it in User Secrets or environment variables.");
+            // JWT Authentication via Keycloak (OpenID Connect discovery)
+            var keycloakSettings = configuration.GetSection("KeycloakSettings");
+            var authority = keycloakSettings["Authority"] ?? throw new InvalidOperationException("KeycloakSettings:Authority is missing in configuration.");
+            var audience = keycloakSettings["Audience"] ?? throw new InvalidOperationException("KeycloakSettings:Audience is missing in configuration.");
+            var metadataAddress = keycloakSettings["MetadataAddress"];
 
             services.AddAuthentication(options =>
             {
@@ -96,15 +97,23 @@ public static class DependencyInjection
             })
             .AddJwtBearer(options =>
             {
+                options.Authority = authority;
+                options.Audience = audience;
+
+                if (!string.IsNullOrWhiteSpace(metadataAddress))
+                {
+                    options.MetadataAddress = metadataAddress;
+                }
+
+                options.RequireHttpsMetadata = true;
+
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
                     ValidateAudience = true,
                     ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtSettings["Issuer"],
-                    ValidAudience = jwtSettings["Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                    ValidIssuer = authority,
+                    ValidAudience = audience,
                     ClockSkew = TimeSpan.Zero
                 };
             });

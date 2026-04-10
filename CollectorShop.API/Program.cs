@@ -6,6 +6,7 @@ using CollectorShop.Domain.ValueObjects;
 using CollectorShop.Infrastructure;
 using CollectorShop.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -29,7 +30,16 @@ builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<CollectorShop.Infrastructure.Data.ApplicationDbContext>("database");
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // Apply migrations (skip for non-relational providers, e.g. InMemory in tests)
 using (var scope = app.Services.CreateScope())

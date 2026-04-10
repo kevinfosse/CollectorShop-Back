@@ -8,6 +8,7 @@ namespace CollectorShop.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class CategoriesController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;

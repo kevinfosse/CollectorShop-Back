@@ -42,7 +42,7 @@ public static class DependencyInjection
                 {
                     builder.WithOrigins(allowedOrigins)
                            .AllowAnyMethod()
-                           .AllowAnyHeader()
+                           .WithHeaders("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With")
                            .AllowCredentials();
                 }
                 else
@@ -50,7 +50,7 @@ public static class DependencyInjection
                     // Fallback for development if not configured
                     builder.AllowAnyOrigin()
                            .AllowAnyMethod()
-                           .AllowAnyHeader();
+                           .WithHeaders("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With");
                 }
             });
         });

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Threading.RateLimiting;
 using CollectorShop.API.Authentication;
 using CollectorShop.API.Services;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Serilog;
 
 namespace CollectorShop.API;
 
@@ -105,16 +107,37 @@ public static class DependencyInjection
                     options.MetadataAddress = metadataAddress;
                 }
 
-                options.RequireHttpsMetadata = true;
+                options.RequireHttpsMetadata = false;
+
+                // Allow internal pod-to-pod communication even with self-signed certs.
+                options.BackchannelHttpHandler = new HttpClientHandler
+                {
+                    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+                };
 
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
                     ValidateAudience = true,
                     ValidateLifetime = true,
-                    ValidIssuer = authority,
-                    ValidAudience = audience,
+                    ValidIssuer = "https://authcollector.duckdns.org/realms/CollectorShop",
+                    ValidAudience = "collectorshop-client",
                     ClockSkew = TimeSpan.Zero
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnAuthenticationFailed = context =>
+                    {
+                        Log.Error("JWT authentication failed: {ErrorMessage}", context.Exception.Message);
+                        return Task.CompletedTask;
+                    },
+                    OnTokenValidated = context =>
+                    {
+                        var userName = context.Principal?.Identity?.Name ?? "unknown";
+                        Log.Information("JWT token validated successfully for user {UserName}", userName);
+                        return Task.CompletedTask;
+                    }
                 };
             });
         }
